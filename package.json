@@ -1,0 +1,36 @@
+{
+  "name": "tux-contracts",
+  "version": "1.0.0",
+  "license": "MIT",
+  "scripts": {
+    "test": "hardhat test",
+    "chain": "hardhat node",
+    "coverage": "hardhat coverage",
+    "build": "hardhat clean && hardhat compile",
+    "compile": "yarn build",
+    "deploy": "hardhat run --network localhost scripts/deploy.js"
+  },
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.2",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@openzeppelin/contracts": "^4.3.1",
+    "@typechain/ethers-v5": "^7.0.1",
+    "@typechain/hardhat": "^2.3.0",
+    "@types/chai": "^4.2.21",
+    "@types/chai-as-promised": "^7.1.4",
+    "@types/mocha": "^9.0.0",
+    "@types/node": "^16.9.1",
+    "chai": "^4.3.4",
+    "chai-as-promised": "^7.1.1",
+    "ethereum-waffle": "^3.4.0",
+    "ethers": "^5.4.6",
+    "hardhat": "^2.6.4",
+    "hardhat-abi-exporter": "^2.3.0",
+    "hardhat-gas-reporter": "^1.0.4",
+    "solidity-coverage": "^0.7.17",
+    "ts-node": "^10.2.1",
+    "typechain": "^5.1.2",
+    "typescript": "^4.4.2"
+  },
+  "dependencies": {}
+}
