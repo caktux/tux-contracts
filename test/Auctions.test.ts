@@ -651,6 +651,28 @@ describe("Auctions", () => {
         expect(beforeDuration).to.eq(afterDuration)
       })
 
+      it("should not update the auction's duration if the initial duration is zero", async () => {
+        await mint(tux)
+        tux.approve(auctions.address, 2)
+
+        const houseId = 1
+        const tokenId = 2
+        const duration = 0
+        const reservePrice = BigNumber.from(10).pow(18).div(2)
+        await auctions.createAuction(
+          tux.address,
+          tokenId,
+          duration,
+          reservePrice,
+          1
+        )
+
+        await auctions.createBid(2, ONE_ETH, { value: ONE_ETH })
+        const afterDuration = (await auctions.auctions(2)).duration
+
+        expect(afterDuration).to.eq(duration)
+      })
+
       it("should store the bidder's information", async () => {
         await auctions.connect(bidderA).createBid(1, ONE_ETH, {
           value: ONE_ETH,

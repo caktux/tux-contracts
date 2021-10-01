@@ -641,10 +641,12 @@ contract Auctions is
         }
 
         bool extended = false;
-        uint256 timeRemaining = auction.firstBidTime.add(auction.duration).sub(block.timestamp);
-        if (timeRemaining < timeBuffer) {
-            auction.duration += timeBuffer.sub(timeRemaining);
-            extended = true;
+        if (auction.duration > 0) {
+          uint256 timeRemaining = auction.firstBidTime.add(auction.duration).sub(block.timestamp);
+          if (timeRemaining < timeBuffer) {
+              auction.duration += timeBuffer.sub(timeRemaining);
+              extended = true;
+          }
         }
 
         emit AuctionBid(
