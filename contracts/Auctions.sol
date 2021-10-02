@@ -5,10 +5,12 @@ pragma solidity 0.8.7;
 import { ITux } from "./ITux.sol";
 import { IAuctions } from "./IAuctions.sol";
 
+import "./library/UintSet.sol";
+import "./library/AddressSet.sol";
+import "./library/OrderedSet.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { IERC721, IERC165 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { IERC721Metadata } from "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 
@@ -18,9 +20,10 @@ contract Auctions is
     ReentrancyGuard
 {
     using SafeMath for uint256;
+    using UintSet for UintSet.Set;
+    using AddressSet for AddressSet.Set;
+    using OrderedSet for OrderedSet.Set;
     using Counters for Counters.Counter;
-    using EnumerableSet for EnumerableSet.UintSet;
-    using EnumerableSet for EnumerableSet.AddressSet;
 
     Counters.Counter private _bidIdTracker;
     Counters.Counter private _houseIdTracker;
@@ -82,34 +85,37 @@ contract Auctions is
     mapping(address => IAuctions.CollectorStats) public collectorStats;
 
     // Mapping from house ID to token IDs requiring approval
-    mapping(uint256 => EnumerableSet.UintSet) private _houseQueue;
+    mapping(uint256 => UintSet.Set) private _houseQueue;
 
     // Mapping from auction ID to bids
-    mapping(uint256 => EnumerableSet.UintSet) private _auctionBids;
+    mapping(uint256 => UintSet.Set) private _auctionBids;
 
     // Mapping from house ID to active auction IDs
-    mapping(uint256 => EnumerableSet.UintSet) private _houseAuctions;
+    mapping(uint256 => OrderedSet.Set) private _houseAuctions;
 
     // Mapping from curator to enumerable house IDs
-    mapping(address => EnumerableSet.UintSet) private _curatorHouses;
+    mapping(address => UintSet.Set) private _curatorHouses;
 
     // Mapping from creator to enumerable house IDs
-    mapping(address => EnumerableSet.UintSet) private _creatorHouses;
+    mapping(address => UintSet.Set) private _creatorHouses;
 
     // Mapping from house id to enumerable creators
-    mapping(uint256 => EnumerableSet.AddressSet) private _houseCreators;
+    mapping(uint256 => AddressSet.Set) private _houseCreators;
 
     // Mapping from seller to active auction IDs
-    mapping(address => EnumerableSet.UintSet) private _sellerAuctions;
+    mapping(address => UintSet.Set) private _sellerAuctions;
 
     // Mapping from bidder to active auction IDs
-    mapping(address => EnumerableSet.UintSet) private _bidderAuctions;
+    mapping(address => UintSet.Set) private _bidderAuctions;
 
     // Mapping from keccak256(contract, token) to previous auction IDs
-    mapping(bytes32 => EnumerableSet.UintSet) private _previousTokenAuctions;
+    mapping(bytes32 => UintSet.Set) private _previousTokenAuctions;
 
     // Mapping from keccak256(contract, token) to offer IDs
-    mapping(bytes32 => EnumerableSet.UintSet) private _tokenOffers;
+    mapping(bytes32 => UintSet.Set) private _tokenOffers;
+
+    // OrderedSet of active auction IDs without a house ID
+    OrderedSet.Set private _activeAuctions;
 
 
     bytes4 constant interfaceId = 0x5b5e139f; // ERC721 interfaceId
@@ -155,16 +161,36 @@ contract Auctions is
         return _collectorsTracker.current();
     }
 
+    function totalActiveAuctions() public view override returns (uint256) {
+        return _activeAuctions.length();
+    }
+
+    function totalActiveHouseAuctions(uint256 houseId) public view override returns (uint256) {
+        return _houseAuctions[houseId].length();
+    }
+
+    function getAuctions() public view override returns (uint256[] memory) {
+        return _activeAuctions.values();
+    }
+
+    function getAuctionsFromN(uint256 from, uint256 n) public view override returns (uint256[] memory) {
+        return _activeAuctions.valuesFromN(from, n);
+    }
+
+    function getHouseAuctions(uint256 houseId) public view override returns (uint256[] memory) {
+        return _houseAuctions[houseId].values();
+    }
+
+    function getHouseAuctionsFromN(uint256 houseId, uint256 from, uint256 n) public view override returns (uint256[] memory) {
+        return _houseAuctions[houseId].valuesFromN(from, n);
+    }
+
     function getHouseQueue(uint256 houseId) public view override returns (uint256[] memory) {
         return _houseQueue[houseId].values();
     }
 
     function getAuctionBids(uint256 auctionId) public view override returns (uint256[] memory) {
         return _auctionBids[auctionId].values();
-    }
-
-    function getHouseAuctions(uint256 houseId) public view override returns (uint256[] memory) {
-        return _houseAuctions[houseId].values();
     }
 
     function getCuratorHouses(address curator) public view override returns (uint256[] memory) {
@@ -438,12 +464,15 @@ contract Auctions is
         bool approved = (curator == address(0) || preApproved || curator == tokenOwner);
 
         if (houseId > 0) {
-          if (approved == true) {
-              _houseAuctions[houseId].add(auctionId);
-          }
-          else {
-              _houseQueue[houseId].add(auctionId);
-          }
+            if (approved == true) {
+                _houseAuctions[houseId].add(auctionId);
+            }
+            else {
+                _houseQueue[houseId].add(auctionId);
+            }
+        }
+        else {
+            _activeAuctions.add(auctionId);
         }
 
         auctions[auctionId] = Auction({
@@ -722,6 +751,9 @@ contract Auctions is
             }
             _houseAuctions[houseId].remove(auctionId);
         }
+        else {
+            _activeAuctions.remove(auctionId);
+        }
 
         uint256 contractRank = contracts[contractId].rank;
         if (contractRank > 1) {
@@ -889,15 +921,17 @@ contract Auctions is
     function _cancelAuction(uint256 auctionId) internal {
         IAuctions.Auction storage auction = auctions[auctionId];
 
-        IERC721(auction.tokenContract).safeTransferFrom(
-          address(this), auction.tokenOwner, auction.tokenId);
+        IERC721(auction.tokenContract).safeTransferFrom(address(this), auction.tokenOwner, auction.tokenId);
 
         uint256 houseId = auction.houseId;
         if (houseId > 0) {
-          _houseAuctions[houseId].remove(auctionId);
-          if (houses[houseId].activeAuctions > 0) {
-              houses[houseId].activeAuctions -= 1;
-          }
+            _houseAuctions[houseId].remove(auctionId);
+            if (houses[houseId].activeAuctions > 0) {
+                houses[houseId].activeAuctions -= 1;
+            }
+        }
+        else {
+            _activeAuctions.remove(auctionId);
         }
 
         auction.approved = false;

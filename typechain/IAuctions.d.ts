@@ -31,10 +31,13 @@ interface IAuctionsInterface extends ethers.utils.Interface {
     "createHouse(string,address,uint16,bool,string)": FunctionFragment;
     "endAuction(uint256)": FunctionFragment;
     "getAuctionBids(uint256)": FunctionFragment;
+    "getAuctions()": FunctionFragment;
+    "getAuctionsFromN(uint256,uint256)": FunctionFragment;
     "getBidderAuctions(address)": FunctionFragment;
     "getCreatorHouses(address)": FunctionFragment;
     "getCuratorHouses(address)": FunctionFragment;
     "getHouseAuctions(uint256)": FunctionFragment;
+    "getHouseAuctionsFromN(uint256,uint256,uint256)": FunctionFragment;
     "getHouseCreators(uint256)": FunctionFragment;
     "getHouseQueue(uint256)": FunctionFragment;
     "getPreviousAuctions(bytes32)": FunctionFragment;
@@ -45,6 +48,8 @@ interface IAuctionsInterface extends ethers.utils.Interface {
     "removeCreator(uint256,address)": FunctionFragment;
     "setAuctionApproval(uint256,bool)": FunctionFragment;
     "setAuctionReservePrice(uint256,uint256)": FunctionFragment;
+    "totalActiveAuctions()": FunctionFragment;
+    "totalActiveHouseAuctions(uint256)": FunctionFragment;
     "totalAuctions()": FunctionFragment;
     "totalCollectors()": FunctionFragment;
     "totalContracts()": FunctionFragment;
@@ -94,6 +99,14 @@ interface IAuctionsInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "getAuctions",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getAuctionsFromN",
+    values: [BigNumberish, BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "getBidderAuctions",
     values: [string]
   ): string;
@@ -108,6 +121,10 @@ interface IAuctionsInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "getHouseAuctions",
     values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getHouseAuctionsFromN",
+    values: [BigNumberish, BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "getHouseCreators",
@@ -148,6 +165,14 @@ interface IAuctionsInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "setAuctionReservePrice",
     values: [BigNumberish, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "totalActiveAuctions",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "totalActiveHouseAuctions",
+    values: [BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "totalAuctions",
@@ -212,6 +237,14 @@ interface IAuctionsInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "getAuctions",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getAuctionsFromN",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "getBidderAuctions",
     data: BytesLike
   ): Result;
@@ -225,6 +258,10 @@ interface IAuctionsInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "getHouseAuctions",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getHouseAuctionsFromN",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -262,6 +299,14 @@ interface IAuctionsInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "setAuctionReservePrice",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "totalActiveAuctions",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "totalActiveHouseAuctions",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -426,6 +471,14 @@ export class IAuctions extends BaseContract {
       overrides?: CallOverrides
     ): Promise<[BigNumber[]]>;
 
+    getAuctions(overrides?: CallOverrides): Promise<[BigNumber[]]>;
+
+    getAuctionsFromN(
+      from: BigNumberish,
+      n: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<[BigNumber[]]>;
+
     getBidderAuctions(
       bidder: string,
       overrides?: CallOverrides
@@ -443,6 +496,13 @@ export class IAuctions extends BaseContract {
 
     getHouseAuctions(
       houseId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<[BigNumber[]]>;
+
+    getHouseAuctionsFromN(
+      houseId: BigNumberish,
+      from: BigNumberish,
+      n: BigNumberish,
       overrides?: CallOverrides
     ): Promise<[BigNumber[]]>;
 
@@ -500,6 +560,13 @@ export class IAuctions extends BaseContract {
       reservePrice: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<ContractTransaction>;
+
+    totalActiveAuctions(overrides?: CallOverrides): Promise<[BigNumber]>;
+
+    totalActiveHouseAuctions(
+      houseId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<[BigNumber]>;
 
     totalAuctions(overrides?: CallOverrides): Promise<[BigNumber]>;
 
@@ -594,6 +661,14 @@ export class IAuctions extends BaseContract {
     overrides?: CallOverrides
   ): Promise<BigNumber[]>;
 
+  getAuctions(overrides?: CallOverrides): Promise<BigNumber[]>;
+
+  getAuctionsFromN(
+    from: BigNumberish,
+    n: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<BigNumber[]>;
+
   getBidderAuctions(
     bidder: string,
     overrides?: CallOverrides
@@ -611,6 +686,13 @@ export class IAuctions extends BaseContract {
 
   getHouseAuctions(
     houseId: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<BigNumber[]>;
+
+  getHouseAuctionsFromN(
+    houseId: BigNumberish,
+    from: BigNumberish,
+    n: BigNumberish,
     overrides?: CallOverrides
   ): Promise<BigNumber[]>;
 
@@ -668,6 +750,13 @@ export class IAuctions extends BaseContract {
     reservePrice: BigNumberish,
     overrides?: Overrides & { from?: string | Promise<string> }
   ): Promise<ContractTransaction>;
+
+  totalActiveAuctions(overrides?: CallOverrides): Promise<BigNumber>;
+
+  totalActiveHouseAuctions(
+    houseId: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
 
   totalAuctions(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -762,6 +851,14 @@ export class IAuctions extends BaseContract {
       overrides?: CallOverrides
     ): Promise<BigNumber[]>;
 
+    getAuctions(overrides?: CallOverrides): Promise<BigNumber[]>;
+
+    getAuctionsFromN(
+      from: BigNumberish,
+      n: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber[]>;
+
     getBidderAuctions(
       bidder: string,
       overrides?: CallOverrides
@@ -779,6 +876,13 @@ export class IAuctions extends BaseContract {
 
     getHouseAuctions(
       houseId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber[]>;
+
+    getHouseAuctionsFromN(
+      houseId: BigNumberish,
+      from: BigNumberish,
+      n: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber[]>;
 
@@ -836,6 +940,13 @@ export class IAuctions extends BaseContract {
       reservePrice: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
+
+    totalActiveAuctions(overrides?: CallOverrides): Promise<BigNumber>;
+
+    totalActiveHouseAuctions(
+      houseId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     totalAuctions(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -1020,6 +1131,14 @@ export class IAuctions extends BaseContract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    getAuctions(overrides?: CallOverrides): Promise<BigNumber>;
+
+    getAuctionsFromN(
+      from: BigNumberish,
+      n: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     getBidderAuctions(
       bidder: string,
       overrides?: CallOverrides
@@ -1037,6 +1156,13 @@ export class IAuctions extends BaseContract {
 
     getHouseAuctions(
       houseId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    getHouseAuctionsFromN(
+      houseId: BigNumberish,
+      from: BigNumberish,
+      n: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
@@ -1093,6 +1219,13 @@ export class IAuctions extends BaseContract {
       auctionId: BigNumberish,
       reservePrice: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<BigNumber>;
+
+    totalActiveAuctions(overrides?: CallOverrides): Promise<BigNumber>;
+
+    totalActiveHouseAuctions(
+      houseId: BigNumberish,
+      overrides?: CallOverrides
     ): Promise<BigNumber>;
 
     totalAuctions(overrides?: CallOverrides): Promise<BigNumber>;
@@ -1189,6 +1322,14 @@ export class IAuctions extends BaseContract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    getAuctions(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    getAuctionsFromN(
+      from: BigNumberish,
+      n: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
     getBidderAuctions(
       bidder: string,
       overrides?: CallOverrides
@@ -1206,6 +1347,13 @@ export class IAuctions extends BaseContract {
 
     getHouseAuctions(
       houseId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    getHouseAuctionsFromN(
+      houseId: BigNumberish,
+      from: BigNumberish,
+      n: BigNumberish,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
@@ -1262,6 +1410,15 @@ export class IAuctions extends BaseContract {
       auctionId: BigNumberish,
       reservePrice: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<PopulatedTransaction>;
+
+    totalActiveAuctions(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    totalActiveHouseAuctions(
+      houseId: BigNumberish,
+      overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
     totalAuctions(overrides?: CallOverrides): Promise<PopulatedTransaction>;

@@ -61,7 +61,7 @@ export const approveAuctions = async (
   tux: Tux,
   auctions: Auctions
 ) => {
-  await tux.approve(auctions.address, 1)
+  await tux.setApprovalForAll(auctions.address, true)
 }
 
 export const revert = (messages: TemplateStringsArray) =>

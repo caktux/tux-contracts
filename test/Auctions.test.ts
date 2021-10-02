@@ -63,9 +63,9 @@ describe("Auctions", () => {
 
   async function createAuction(
     auctions: Auctions,
-    houseId: number = 0
+    houseId: number = 0,
+    tokenId: number = 1
   ) {
-    const tokenId = 1
     const duration = 60 * 60 * 24
     const reservePrice = BigNumber.from(10).pow(18).div(2)
 
@@ -256,12 +256,23 @@ describe("Auctions", () => {
       const [creator, curator] = await ethers.getSigners()
 
       await auctions.connect(curator).addCreator(1, await creator.getAddress())
-      await createAuction(auctions.connect(creator), 1)
+      await mint(tux)
+      await mint(tux)
+      await mint(tux)
+      await createAuction(auctions, 1)
+      await createAuction(auctions, 1, 2)
+      await createAuction(auctions, 1, 3)
+      await createAuction(auctions, 1, 4)
+      await auctions.cancelAuction(3)
+      await createAuction(auctions, 1, 3)
 
       const auctionList = await auctions.getHouseAuctions(1)
 
-      expect(auctionList.length).eq(1)
-      expect(auctionList[0]).eq(1)
+      expect(auctionList.length).eq(4)
+      expect(auctionList[0]).eq(5)
+      expect(auctionList[1]).eq(4)
+      expect(auctionList[2]).eq(2)
+      expect(auctionList[3]).eq(1)
     })
 
     it('should get house IDs by curator', async () => {
@@ -412,23 +423,14 @@ describe("Auctions", () => {
       expect(createdAuction.fee).to.eq(500)
       expect(createdAuction.tokenOwner).to.eq(owner)
       expect(createdAuction.approved).to.eq(true)
-      // expect(createdAuction.curator).to.eq(curator.address)
     })
-
-    // it("should be automatically approved if the creator is the Zero Address", async () => {
-    //   await createAuction(auctions, 0) // ethers.constants.AddressZero)
-    //
-    //   const createdAuction = await auctions.auctions(0)
-    //
-    //   expect(createdAuction.approved).to.eq(true)
-    // })
 
     it("should emit an AuctionCreated event", async () => {
       const owner = await tux.ownerOf(1)
       const [_, expectedCurator] = await ethers.getSigners()
 
       const block = await ethers.provider.getBlockNumber()
-      await createAuction(auctions, 0) // await expectedCurator.getAddress())
+      await createAuction(auctions, 0)
       const currAuction = await auctions.auctions(1)
       const events = await auctions.queryFilter(
         auctions.filters.AuctionCreated(null),
@@ -456,7 +458,7 @@ describe("Auctions", () => {
       await auctions.connect(curator).addCreator(1, await admin.getAddress())
       await createAuction(
         auctions.connect(admin),
-        1 // await curator.getAddress()
+        1
       )
     })
 
@@ -521,7 +523,7 @@ describe("Auctions", () => {
       await auctions.connect(curator).addCreator(1, await creator.getAddress())
       await createAuction(
         auctions.connect(creator),
-        1 // await curator.getAddress()
+        1
       )
     })
 
@@ -590,9 +592,8 @@ describe("Auctions", () => {
       await auctions.connect(curator).addCreator(1, await admin.getAddress())
       await createAuction(
         auctions.connect(admin),
-        1 // await curator.getAddress()
+        1
       )
-      // await auctions.connect(curator).setAuctionApproval(1, true)
     })
 
     it("should revert if the specified auction does not exist", async () => {
@@ -894,9 +895,8 @@ describe("Auctions", () => {
       await auctions.connect(curator).addCreator(1, await creator.getAddress())
       await createAuction(
         auctions.connect(creator),
-        1 // await curator.getAddress()
+        1
       )
-      // await auctions.connect(curator).setAuctionApproval(1, true)
     })
 
     it("should revert if the auction does not exist", async () => {
@@ -981,9 +981,8 @@ describe("Auctions", () => {
       await auctions.connect(curator).addCreator(1, await creator.getAddress())
       await createAuction(
         auctions.connect(creator),
-        1 // await curator.getAddress()
+        1
       )
-      // await auctions.connect(curator).setAuctionApproval(1, true)
       badBidder = await deployBidder(auctions.address, tux.address)
     })
 

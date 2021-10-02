@@ -428,6 +428,43 @@ const _abi = [
     type: "function",
   },
   {
+    inputs: [],
+    name: "getAuctions",
+    outputs: [
+      {
+        internalType: "uint256[]",
+        name: "",
+        type: "uint256[]",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "from",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "n",
+        type: "uint256",
+      },
+    ],
+    name: "getAuctionsFromN",
+    outputs: [
+      {
+        internalType: "uint256[]",
+        name: "",
+        type: "uint256[]",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [
       {
         internalType: "address",
@@ -493,6 +530,35 @@ const _abi = [
       },
     ],
     name: "getHouseAuctions",
+    outputs: [
+      {
+        internalType: "uint256[]",
+        name: "",
+        type: "uint256[]",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "houseId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "from",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "n",
+        type: "uint256",
+      },
+    ],
+    name: "getHouseAuctionsFromN",
     outputs: [
       {
         internalType: "uint256[]",
@@ -692,6 +758,38 @@ const _abi = [
     name: "setAuctionReservePrice",
     outputs: [],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalActiveAuctions",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "houseId",
+        type: "uint256",
+      },
+    ],
+    name: "totalActiveHouseAuctions",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {

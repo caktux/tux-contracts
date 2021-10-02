@@ -367,7 +367,7 @@ async function main() {
   await auctions.connect(creatorD).createAuction(
     tux.address, // tokenContract
     23, // tokenId
-    3600, // duration
+    0, // duration
     ONE_ETH, // reservePrice
     0 // houseId
   );
@@ -375,7 +375,7 @@ async function main() {
   await auctions.connect(creatorD).createAuction(
     tux.address, // tokenContract
     24, // tokenId
-    3600, // duration
+    0, // duration
     TWO_ETH, // reservePrice
     0 // houseId
   );

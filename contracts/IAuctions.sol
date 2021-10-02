@@ -195,6 +195,18 @@ interface IAuctions {
 
     function totalCollectors() external view returns (uint256);
 
+    function totalActiveAuctions() external view returns (uint256);
+
+    function totalActiveHouseAuctions(uint256 houseId) external view returns (uint256);
+
+    function getAuctions() external view returns (uint256[] memory);
+
+    function getAuctionsFromN(uint256 from, uint256 n) external view returns (uint256[] memory);
+
+    function getHouseAuctions(uint256 houseId) external view returns (uint256[] memory);
+
+    function getHouseAuctionsFromN(uint256 houseId, uint256 from, uint256 n) external view returns (uint256[] memory);
+
     function getHouseQueue(uint256 houseId) external view returns (uint256[] memory);
 
     function getCuratorHouses(address curator) external view returns (uint256[] memory);
@@ -202,8 +214,6 @@ interface IAuctions {
     function getCreatorHouses(address creator) external view returns (uint256[] memory);
 
     function getHouseCreators(uint256 houseId) external view returns (address[] memory);
-
-    function getHouseAuctions(uint256 houseId) external view returns (uint256[] memory);
 
     function getSellerAuctions(address seller) external view returns (uint256[] memory);
 
