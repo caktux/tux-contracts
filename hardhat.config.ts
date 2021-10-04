@@ -1,6 +1,7 @@
 
 import '@typechain/hardhat'
 import '@nomiclabs/hardhat-waffle'
+import "@nomiclabs/hardhat-etherscan"
 
 import "solidity-coverage"
 import "hardhat-gas-reporter"
@@ -46,6 +47,9 @@ module.exports = {
       url: "https://mainnet.infura.io/v3/94d0e160138c4b2b8dda74c503432245",
       // accounts: [privateKey1, privateKey2, ...]
     }
+  },
+  etherscan: {
+    apiKey: "TAKHV99M3FA3878H8KV9W9T9XIW9SR2C2F"
   },
   solidity: {
     version: "0.8.7",
