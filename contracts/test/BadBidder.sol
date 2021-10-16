@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 // FOR TEST PURPOSES ONLY. NOT PRODUCTION SAFE
-pragma solidity 0.8.7;
+pragma solidity 0.8.9;
 import {IAuctions} from "../IAuctions.sol";
 
 // This contract is meant to mimic a bidding contract that does not implement on IERC721 Received,
@@ -15,8 +15,8 @@ contract BadBidder {
         tux = _tux;
     }
 
-    function placeBid(uint256 auctionId, uint256 amount) external payable {
-        IAuctions(auction).createBid{value: amount}(auctionId, amount);
+    function placeBid(uint256 auctionId) external payable {
+        IAuctions(auction).createBid{value: msg.value}(auctionId);
     }
 
     receive() external payable {}

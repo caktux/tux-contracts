@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 // FOR TEST PURPOSES ONLY. NOT PRODUCTION SAFE
-pragma solidity 0.8.7;
+pragma solidity 0.8.9;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 

@@ -99,7 +99,7 @@ async function main() {
     value: hre.ethers.utils.parseUnits("100", 'ether')
   })
   await tux.connect(creatorD).transferFrom(await creatorD.getAddress(), caktux, 16)
-  await auctions.connect(bidderC).makeOffer(tux.address, 16, ONE_ETH, { value: ONE_ETH })
+  await auctions.connect(bidderC).makeOffer(tux.address, 16, { value: ONE_ETH })
 
   await tux.setApprovalForAll(auctions.address, true);
   await tux.connect(creatorB).setApprovalForAll(auctions.address, true);
@@ -383,34 +383,34 @@ async function main() {
 
   await hre.network.provider.request({ method: 'evm_mine' })
 
-  await auctions.connect(bidder).createBid(1, ONE_ETH, { value: ONE_ETH })
+  await auctions.connect(bidder).createBid(1, { value: ONE_ETH })
 
-  await auctions.connect(bidder).createBid(3, TWO_ETH, { value: TWO_ETH })
-  await auctions.connect(bidderB).createBid(3, THREE_ETH, { value: THREE_ETH })
+  await auctions.connect(bidder).createBid(3, { value: TWO_ETH })
+  await auctions.connect(bidderB).createBid(3, { value: THREE_ETH })
 
-  await auctions.connect(bidder).createBid(5, ONE_ETH, { value: ONE_ETH })
-  await auctions.connect(bidderC).createBid(5, TWO_ETH, { value: TWO_ETH })
+  await auctions.connect(bidder).createBid(5, { value: ONE_ETH })
+  await auctions.connect(bidderC).createBid(5, { value: TWO_ETH })
 
-  await auctions.connect(bidder).createBid(6, ONE_ETH, { value: ONE_ETH })
-  await auctions.connect(bidderB).createBid(6, THREE_ETH, { value: THREE_ETH })
+  await auctions.connect(bidder).createBid(6, { value: ONE_ETH })
+  await auctions.connect(bidderB).createBid(6, { value: THREE_ETH })
 
-  await auctions.connect(bidderB).createBid(7, TWO_ETH, { value: TWO_ETH })
-  await auctions.connect(bidderC).createBid(7, THREE_ETH, { value: THREE_ETH })
+  await auctions.connect(bidderB).createBid(7, { value: TWO_ETH })
+  await auctions.connect(bidderC).createBid(7, { value: THREE_ETH })
 
-  await auctions.connect(bidderB).createBid(8, TWO_ETH, { value: TWO_ETH })
-  await auctions.connect(bidderC).createBid(8, THREE_ETH, { value: THREE_ETH })
+  await auctions.connect(bidderB).createBid(8, { value: TWO_ETH })
+  await auctions.connect(bidderC).createBid(8, { value: THREE_ETH })
 
-  await auctions.connect(bidder).createBid(11, TWO_ETH, { value: TWO_ETH })
-  await auctions.connect(bidderC).createBid(11, THREE_ETH, { value: THREE_ETH })
+  await auctions.connect(bidder).createBid(11, { value: TWO_ETH })
+  await auctions.connect(bidderC).createBid(11, { value: THREE_ETH })
 
   await auctions.registerTokenContract('0x3b3ee1931dc30c1957379fac9aba94d1c48a5405') // Foundation
   await auctions.registerTokenContract('0xb932a70a57673d89f4acffbe830e8ed7f75fb9e0') // SuperRare
   await auctions.registerTokenContract('0x60f80121c31a0d46b5279700f9df786054aa5ee5') // Rarible
   await auctions.registerTokenContract('0xfbeef911dc5821886e1dda71586d90ed28174b7d') // KO
-  await auctions.registerTokenContract('0xfe21b0a8df3308c61cb13df57ae5962c567a668a') // Ephimera
-  await auctions.registerTokenContract('0xabEFBc9fD2F806065b4f3C237d4b59D9A97Bcac7') // Zora
-  await auctions.registerTokenContract('0x2a46f2ffd99e19a89476e2f62270e0a35bbf0756') // MP
-  await auctions.registerTokenContract('0x495f947276749ce646f68ac8c248420045cb7b5e') // OS
+  // await auctions.registerTokenContract('0xfe21b0a8df3308c61cb13df57ae5962c567a668a') // Ephimera
+  // await auctions.registerTokenContract('0xabEFBc9fD2F806065b4f3C237d4b59D9A97Bcac7') // Zora
+  // await auctions.registerTokenContract('0x2a46f2ffd99e19a89476e2f62270e0a35bbf0756') // MP
+  // await auctions.registerTokenContract('0x495f947276749ce646f68ac8c248420045cb7b5e') // OS
 }
 
 

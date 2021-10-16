@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity 0.8.7;
+pragma solidity 0.8.9;
 
 import { ITux } from "./ITux.sol";
 import { IAuctions } from "./IAuctions.sol";
@@ -8,6 +8,8 @@ import { IAuctions } from "./IAuctions.sol";
 import "./library/UintSet.sol";
 import "./library/AddressSet.sol";
 import "./library/OrderedSet.sol";
+import "./library/RankedSet.sol";
+import "./library/RankedAddressSet.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -21,17 +23,16 @@ contract Auctions is
 {
     using SafeMath for uint256;
     using UintSet for UintSet.Set;
+    using RankedSet for RankedSet.Set;
+    using RankedAddressSet for RankedAddressSet.Set;
     using AddressSet for AddressSet.Set;
     using OrderedSet for OrderedSet.Set;
     using Counters for Counters.Counter;
 
     Counters.Counter private _bidIdTracker;
+    Counters.Counter private _offerIdTracker;
     Counters.Counter private _houseIdTracker;
     Counters.Counter private _auctionIdTracker;
-    Counters.Counter private _contractIdTracker;
-    Counters.Counter private _offerIdTracker;
-    Counters.Counter private _creatorsTracker;
-    Counters.Counter private _collectorsTracker;
 
     // Minimum amount of time left in seconds to an auction after a new bid is placed
     uint256 constant public timeBuffer = 900;  // 15 minutes -> 900 seconds
@@ -42,26 +43,11 @@ contract Auctions is
     // Mapping from house name to house ID
     mapping(string => uint256) public houseIDs;
 
-    // Mapping from token contract to contract ID
-    mapping(address => uint256) public contractIDs;
-
     // Mapping from keccak256(contract, token) to currently running auction ID
     mapping(bytes32 => uint256) public tokenAuction;
 
-    // Mapping from rank to house ID
-    mapping(uint256 => uint256) public ranking;
-
-    // Mapping from rank to creator
-    mapping(uint256 => address) public creatorRanking;
-
-    // Mapping from rank to collector
-    mapping(uint256 => address) public collectorRanking;
-
-    // Mapping from rank to token contract ID
-    mapping(uint256 => uint256) public contractRanking;
-
     // Mapping of token contracts
-    mapping(uint256 => IAuctions.TokenContract) public contracts;
+    mapping(address => IAuctions.TokenContract) public contracts;
 
     // Mapping of auctions
     mapping(uint256 => IAuctions.Auction) public auctions;
@@ -114,11 +100,28 @@ contract Auctions is
     // Mapping from keccak256(contract, token) to offer IDs
     mapping(bytes32 => UintSet.Set) private _tokenOffers;
 
+    // RankedSet of house IDs
+    RankedSet.Set private _rankedHouses;
+
+    // RankedAddressSet of creators
+    RankedAddressSet.Set private _rankedCreators;
+
+    // RankedAddressSet of collectors
+    RankedAddressSet.Set private _rankedCollectors;
+
+    // OrderedSet of active token contracts
+    RankedAddressSet.Set private _rankedContracts;
+
+    // OrderedSet of active houses
+    OrderedSet.Set private _activeHouses;
+
     // OrderedSet of active auction IDs without a house ID
     OrderedSet.Set private _activeAuctions;
 
 
-    bytes4 constant interfaceId = 0x5b5e139f; // ERC721 interfaceId
+    bytes4 constant interfaceId = 0x80ac58cd; // ERC721 interfaceId
+    bytes4 constant interfaceIdMetadata = 0x5b5e139f; // Metadata extension
+    bytes4 constant interfaceIdEnumerable = 0x780e9d63; // Enumerable extension
 
 
     modifier auctionExists(uint256 auctionId) {
@@ -150,15 +153,19 @@ contract Auctions is
     }
 
     function totalContracts() public view override returns (uint256) {
-        return _contractIdTracker.current();
+        return _rankedContracts.length();
     }
 
     function totalCreators() public view override returns (uint256) {
-        return _creatorsTracker.current();
+        return _rankedCreators.length();
     }
 
     function totalCollectors() public view override returns (uint256) {
-        return _collectorsTracker.current();
+        return _rankedCollectors.length();
+    }
+
+    function totalActiveHouses() public view override returns (uint256) {
+        return _activeHouses.length();
     }
 
     function totalActiveAuctions() public view override returns (uint256) {
@@ -167,6 +174,26 @@ contract Auctions is
 
     function totalActiveHouseAuctions(uint256 houseId) public view override returns (uint256) {
         return _houseAuctions[houseId].length();
+    }
+
+    function getActiveHouses(uint256 from, uint256 n) public view override returns (uint256[] memory) {
+        return _activeHouses.valuesFromN(from, n);
+    }
+
+    function getRankedHouses(uint256 from, uint256 n) public view override returns (uint256[] memory) {
+        return _rankedHouses.valuesFromN(from, n);
+    }
+
+    function getRankedCreators(address from, uint256 n) public view override returns (address[] memory) {
+        return _rankedCreators.valuesFromN(from, n);
+    }
+
+    function getRankedCollectors(address from, uint256 n) public view override returns (address[] memory) {
+        return _rankedCollectors.valuesFromN(from, n);
+    }
+
+    function getRankedContracts(address from, uint256 n) public view override returns (address[] memory) {
+        return _rankedContracts.valuesFromN(from, n);
     }
 
     function getAuctions() public view override returns (uint256[] memory) {
@@ -253,22 +280,14 @@ contract Auctions is
         _houseIdTracker.increment();
         uint256 houseId = _houseIdTracker.current();
 
-        houses[houseId] = House({
-            name: name,
-            curator: payable(curator),
-            fee: fee,
-            preApproved: preApproved,
-            metadata: metadata,
-            bids: 0,
-            sales: 0,
-            total: 0,
-            feesTotal: 0,
-            activeAuctions: 0,
-            rank: houseId
-        });
+        houses[houseId].name = name;
+        houses[houseId].curator = payable(curator);
+        houses[houseId].fee = fee;
+        houses[houseId].preApproved = preApproved;
+        houses[houseId].metadata = metadata;
 
         _curatorHouses[curator].add(houseId);
-        ranking[houseId] = houseId;
+        _rankedHouses.add(houseId);
         houseIDs[name] = houseId;
 
         emit HouseCreated(
@@ -407,9 +426,9 @@ contract Auctions is
         nonReentrant
         returns (uint256)
     {
-        require(
-            IERC165(tokenContract).supportsInterface(interfaceId),
-            "Token contract does not support ERC721 interface");
+        if (contracts[tokenContract].tokenContract == address(0)) {
+            registerTokenContract(tokenContract);
+        }
 
         address tokenOwner = IERC721(tokenContract).ownerOf(tokenId);
         require(
@@ -436,22 +455,10 @@ contract Auctions is
             houses[houseId].activeAuctions += 1;
         }
 
-        if (contractIDs[tokenContract] == 0) {
-          registerTokenContract(tokenContract);
-        }
-
         try ITux(tokenContract).tokenCreator(tokenId) returns (address creator) {
-          if (accounts[creator].creatorRank == 0) {
-              _creatorsTracker.increment();
-              uint256 creatorRank = _creatorsTracker.current();
-              creatorRanking[creatorRank] = creator;
-              accounts[creator].creatorRank = creatorRank;
-              creatorStats[creator] = CreatorStats({
-                  bids: 0,
-                  sales: 0,
-                  total: 0
-              });
-          }
+            if (!_rankedCreators.contains(creator)) {
+                _rankedCreators.add(creator);
+            }
         } catch {}
 
         _auctionIdTracker.increment();
@@ -466,6 +473,12 @@ contract Auctions is
         if (houseId > 0) {
             if (approved == true) {
                 _houseAuctions[houseId].add(auctionId);
+                if (_activeHouses.head() != houseId) {
+                    if (_activeHouses.contains(houseId)) {
+                        _activeHouses.remove(houseId);
+                    }
+                    _activeHouses.add(houseId);
+                }
             }
             else {
                 _houseQueue[houseId].add(auctionId);
@@ -500,7 +513,7 @@ contract Auctions is
     }
 
     function setAuctionApproval(uint256 auctionId, bool approved)
-        external
+        public
         override
         auctionExists(auctionId)
     {
@@ -523,6 +536,13 @@ contract Auctions is
         if (approved == true) {
             _houseAuctions[auction.houseId].add(auctionId);
             _houseQueue[auction.houseId].remove(auctionId);
+
+            if (_activeHouses.head() != auction.houseId) {
+                if (_activeHouses.contains(auction.houseId)) {
+                    _activeHouses.remove(auction.houseId);
+                }
+                _activeHouses.add(auction.houseId);
+            }
         }
 
         emit AuctionApprovalUpdated(
@@ -532,7 +552,7 @@ contract Auctions is
     }
 
     function setAuctionReservePrice(uint256 auctionId, uint256 reservePrice)
-        external
+        public
         override
         auctionExists(auctionId)
     {
@@ -553,12 +573,12 @@ contract Auctions is
         );
     }
 
-    function createBid(uint256 auctionId, uint256 amount)
-        external
-        override
+    function createBid(uint256 auctionId)
+        public
         payable
-        auctionExists(auctionId)
+        override
         nonReentrant
+        auctionExists(auctionId)
     {
         IAuctions.Auction storage auction = auctions[auctionId];
 
@@ -566,18 +586,15 @@ contract Auctions is
             auction.approved,
             "Auction must be approved by curator");
         require(
-            msg.value == amount,
-            "Sent ETH does not match specified bid amount");
-        require(
             auction.firstBidTime == 0 ||
             block.timestamp < auction.firstBidTime.add(auction.duration),
             "Auction expired");
         require(
-            amount >= auction.amount.add(
+            msg.value >= auction.amount.add(
                 auction.amount.mul(minimumIncrementPercentage).div(10000)),
             "Must send more than last bid by 5%");
         require(
-            amount >= auction.reservePrice,
+            msg.value >= auction.reservePrice,
             "Bid below reserve price");
 
         address payable lastBidder = auction.bidder;
@@ -592,81 +609,43 @@ contract Auctions is
             _handleOutgoingBid(lastBidder, auction.amount);
         }
 
-        _handleIncomingBid(amount);
-
-        auction.amount = amount;
+        auction.amount = msg.value;
         auction.bidder = payable(msg.sender);
 
-        _bidIdTracker.increment();
-        uint256 bidId = _bidIdTracker.current();
+        if (auction.duration > 0) {
+            _bidIdTracker.increment();
+            uint256 bidId = _bidIdTracker.current();
 
-        bids[bidId] = Bid({
-            timestamp: block.timestamp,
-            bidder: msg.sender,
-            value: amount
-        });
+            bids[bidId] = Bid({
+                timestamp: block.timestamp,
+                bidder: msg.sender,
+                value: msg.value
+            });
 
-        _auctionBids[auctionId].add(bidId);
-        _bidderAuctions[msg.sender].add(auctionId);
+            _auctionBids[auctionId].add(bidId);
+            _bidderAuctions[msg.sender].add(auctionId);
+        }
 
-        contracts[contractIDs[auction.tokenContract]].bids += 1;
+        contracts[auction.tokenContract].bids += 1;
 
         try ITux(auction.tokenContract).tokenCreator(auction.tokenId) returns (address creator) {
             if (creator == auction.tokenOwner) {
                 creatorStats[auction.tokenOwner].bids += 1;
             }
-
-            uint256 creatorRank = accounts[creator].creatorRank;
-            if (creatorRank > 1) {
-                address rankedUp = creatorRanking[creatorRank - 1];
-                if (creatorStats[creator].bids > creatorStats[rankedUp].bids) {
-                    accounts[creator].creatorRank -= 1;
-                    accounts[rankedUp].creatorRank += 1;
-                    creatorRanking[creatorRank - 1] = creator;
-                    creatorRanking[creatorRank] = rankedUp;
-                }
-            }
         } catch {}
 
-        uint256 collectorRank = accounts[msg.sender].collectorRank;
-        if (collectorRank == 0) {
-            _collectorsTracker.increment();
-            collectorRank = _collectorsTracker.current();
-            collectorRanking[collectorRank] = msg.sender;
-            accounts[msg.sender].collectorRank = collectorRank;
-            collectorStats[msg.sender] = CollectorStats({
-                bids: 0,
-                sales: 0,
-                bought: 0,
-                totalSold: 0,
-                totalSpent: 0
-            });
+        if (collectorStats[msg.sender].bids == 0) {
+            _rankedCollectors.add(msg.sender);
         }
         collectorStats[msg.sender].bids += 1;
-        if (collectorRank > 1) {
-            address rankedUp = collectorRanking[collectorRank - 1];
-            if (collectorStats[msg.sender].bids > collectorStats[rankedUp].bids) {
-                accounts[msg.sender].collectorRank -= 1;
-                accounts[rankedUp].collectorRank += 1;
-                collectorRanking[collectorRank - 1] = msg.sender;
-                collectorRanking[collectorRank] = rankedUp;
-            }
-        }
 
-        uint256 houseId = auction.houseId;
-        if (houseId > 0) {
-            houses[houseId].bids += 1;
+        if (auction.houseId > 0) {
+            /* uint256 _bids = houses[auction.houseId].bids; // This gets too expensive... */
+            houses[auction.houseId].bids += 1;
+            /* _rankedHouses.rankScore(auction.houseId, _bids, houses[auction.houseId].bids); */
 
-            uint256 rank = houses[houseId].rank;
-            if (rank > 1) {
-                uint256 rankedUpId = ranking[rank - 1];
-                if (houses[houseId].bids > houses[rankedUpId].bids) {
-                    houses[houseId].rank -= 1;
-                    houses[rankedUpId].rank += 1;
-                    ranking[rank - 1] = houseId;
-                    ranking[rank] = rankedUpId;
-                }
-            }
+            _houseAuctions[auction.houseId].remove(auctionId);
+            _houseAuctions[auction.houseId].add(auctionId);
         }
 
         bool extended = false;
@@ -681,7 +660,7 @@ contract Auctions is
         emit AuctionBid(
             auctionId,
             msg.sender,
-            amount,
+            msg.value,
             isFirstBid,
             extended
         );
@@ -695,10 +674,10 @@ contract Auctions is
     }
 
     function endAuction(uint256 auctionId)
-        external
+        public
         override
-        auctionExists(auctionId)
         nonReentrant
+        auctionExists(auctionId)
     {
         IAuctions.Auction storage auction = auctions[auctionId];
 
@@ -723,11 +702,10 @@ contract Auctions is
         uint256 curatorFee = 0;
         uint256 tokenOwnerProfit = auction.amount;
 
-        uint256 contractId = contractIDs[auction.tokenContract];
         collectorStats[auction.bidder].bought += 1;
         collectorStats[auction.bidder].totalSpent += tokenOwnerProfit;
-        contracts[contractId].sales += 1;
-        contracts[contractId].total += tokenOwnerProfit;
+        contracts[auction.tokenContract].sales += 1;
+        contracts[auction.tokenContract].total += tokenOwnerProfit;
 
         try ITux(auction.tokenContract).tokenCreator(auction.tokenId) returns (address creator) {
             if (creator == auction.tokenOwner) {
@@ -755,17 +733,6 @@ contract Auctions is
             _activeAuctions.remove(auctionId);
         }
 
-        uint256 contractRank = contracts[contractId].rank;
-        if (contractRank > 1) {
-            uint256 rankedUpContract = contractRanking[contractRank - 1];
-            if (contracts[contractId].bids > contracts[rankedUpContract].bids) {
-                contracts[contractId].rank -= 1;
-                contracts[rankedUpContract].rank += 1;
-                contractRanking[contractRank - 1] = contractId;
-                contractRanking[contractRank] = rankedUpContract;
-            }
-        }
-
         if (curator != address(0)) {
             curatorFee = tokenOwnerProfit.mul(auction.fee).div(10000);
             tokenOwnerProfit = tokenOwnerProfit.sub(curatorFee);
@@ -781,12 +748,15 @@ contract Auctions is
         _previousTokenAuctions[auctionHash].add(auctionId);
         delete tokenAuction[auctionHash];
 
-        uint256 i = _auctionBids[auctionId].length();
-        while (i > 0) {
-            uint256 bidId = _auctionBids[auctionId].at(i - 1);
-            _bidderAuctions[bids[bidId].bidder].remove(auctionId);
-            i--;
+        if (auction.duration > 0) {
+            uint256 i = _auctionBids[auctionId].length();
+            while (i > 0) {
+                uint256 bidId = _auctionBids[auctionId].at(i - 1);
+                _bidderAuctions[bids[bidId].bidder].remove(auctionId);
+                i--;
+            }
         }
+
         _sellerAuctions[auction.tokenOwner].remove(auctionId);
 
         emit AuctionEnded(
@@ -794,40 +764,55 @@ contract Auctions is
         );
     }
 
-    function cancelAuction(uint256 auctionId) external override nonReentrant auctionExists(auctionId) {
+    function buyAuction(uint256 auctionId)
+        public
+        payable
+        override
+    {
+        createBid(auctionId);
+        endAuction(auctionId);
+    }
+
+    function cancelAuction(uint256 auctionId)
+        public
+        override
+        nonReentrant
+        auctionExists(auctionId)
+    {
         require(
             auctions[auctionId].tokenOwner == msg.sender,
             "Can only be called by auction creator");
         require(
             uint256(auctions[auctionId].firstBidTime) == 0,
             "Cannot cancel an auction once it has begun");
+
         _cancelAuction(auctionId);
     }
 
     function registerTokenContract(address tokenContract)
         public
         override
-        returns (uint256)
     {
-        require(contractIDs[tokenContract] == 0, "Token contract already registered");
+        require(
+            contracts[tokenContract].tokenContract == address(0),
+            "Token contract already registered");
+        require(
+            IERC165(tokenContract).supportsInterface(interfaceId),
+            "Token contract does not support the ERC721 interface");
+        require(
+            IERC165(tokenContract).supportsInterface(interfaceIdMetadata),
+            "Token contract does not support the ERC721 Metadata extension");
+        require(
+            IERC165(tokenContract).supportsInterface(interfaceIdEnumerable),
+            "Token contract does not support the ERC721 Enumerable extension");
 
-        _contractIdTracker.increment();
-        uint256 contractId = _contractIdTracker.current();
-        contractIDs[tokenContract] = contractId;
-        contractRanking[contractId] = contractId;
-        contracts[contractId] = TokenContract({
-            name: IERC721Metadata(tokenContract).name(),
-            tokenContract: tokenContract,
-            bids: 0,
-            sales: 0,
-            total: 0,
-            rank: contractId
-        });
+        contracts[tokenContract].name = IERC721Metadata(tokenContract).name();
+        contracts[tokenContract].tokenContract = tokenContract;
 
-        return contractId;
+        _rankedContracts.add(tokenContract);
     }
 
-    function makeOffer(address tokenContract, uint256 tokenId, uint256 amount)
+    function makeOffer(address tokenContract, uint256 tokenId)
         public
         override
         payable
@@ -835,16 +820,12 @@ contract Auctions is
     {
         require(
             IERC165(tokenContract).supportsInterface(interfaceId),
-            "Token contract does not support ERC721 interface");
+            "Token contract does not support the ERC721 interface");
 
         bytes32 auctionHash = keccak256(abi.encode(tokenContract, tokenId));
         require(
             tokenAuction[auctionHash] == 0,
             'Auction exists for this token');
-
-        require(
-            msg.value == amount,
-            "Sent ETH does not match specified offer amount");
 
         _offerIdTracker.increment();
         uint256 offerId = _offerIdTracker.current();
@@ -853,7 +834,8 @@ contract Auctions is
             tokenContract: tokenContract,
             tokenId: tokenId,
             from: msg.sender,
-            amount: amount
+            amount: msg.value,
+            timestamp: block.timestamp
         });
 
         _tokenOffers[auctionHash].add(offerId);
@@ -901,10 +883,68 @@ contract Auctions is
         delete offers[offerId];
     }
 
-    function _handleIncomingBid(uint256 amount) internal {
+    function updateHouseRank(uint256 houseId)
+        public
+        override
+    {
         require(
-            msg.value == amount,
-            "Sent ETH does not match specified bid amount");
+            houses[houseId].lastRankedBids < houses[houseId].bids,
+            "House ranking already up to date");
+
+        _rankedHouses.rankScore(
+            houseId,
+            houses[houseId].lastRankedBids,
+            houses[houseId].bids
+        );
+        houses[houseId].lastRankedBids = houses[houseId].bids;
+    }
+
+    function updateCreatorRank(address creator)
+        public
+        override
+    {
+        require(
+            creatorStats[creator].lastRankedBids < creatorStats[creator].bids,
+            "Creator ranking already up to date");
+
+        _rankedCreators.rankScore(
+            creator,
+            creatorStats[creator].lastRankedBids,
+            creatorStats[creator].bids
+        );
+        creatorStats[creator].lastRankedBids = creatorStats[creator].bids;
+    }
+
+    function updateCollectorRank(address collector)
+        public
+        override
+    {
+        require(
+            collectorStats[collector].lastRankedBids < collectorStats[collector].bids,
+            "Collector ranking already up to date");
+
+        _rankedCollectors.rankScore(
+            collector,
+            collectorStats[collector].lastRankedBids,
+            collectorStats[collector].bids
+        );
+        collectorStats[collector].lastRankedBids = collectorStats[collector].bids;
+    }
+
+    function updateContractRank(address tokenContract)
+        public
+        override
+    {
+        require(
+            contracts[tokenContract].lastRankedBids < contracts[tokenContract].bids,
+            "Collection ranking already up to date");
+
+        _rankedContracts.rankScore(
+            tokenContract,
+            contracts[tokenContract].lastRankedBids,
+            contracts[tokenContract].bids
+        );
+        contracts[tokenContract].lastRankedBids = contracts[tokenContract].bids;
     }
 
     function _handleOutgoingBid(address to, uint256 amount) internal {

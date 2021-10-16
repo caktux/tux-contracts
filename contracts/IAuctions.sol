@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity 0.8.7;
+pragma solidity 0.8.9;
 
 
 interface IAuctions {
@@ -36,8 +36,8 @@ interface IAuctions {
         // Counter of active autions
         uint256 activeAuctions;
 
-        // Rank
-        uint256 rank;
+        // Last ranked bid count
+        uint256 lastRankedBids;
     }
 
     struct Auction {
@@ -84,21 +84,20 @@ interface IAuctions {
         uint256 bids;
         uint256 sales;
         uint256 total;
-        uint256 rank;
+        uint256 lastRankedBids;
     }
 
     struct Account {
         string  name;
         string  bioHash;
         string  pictureHash;
-        uint256 creatorRank;
-        uint256 collectorRank;
     }
 
     struct CreatorStats {
         uint256 bids;
         uint256 sales;
         uint256 total;
+        uint256 lastRankedBids;
     }
 
     struct CollectorStats {
@@ -107,6 +106,7 @@ interface IAuctions {
         uint256 bought;
         uint256 totalSold;
         uint256 totalSpent;
+        uint256 lastRankedBids;
     }
 
     struct Bid {
@@ -118,8 +118,9 @@ interface IAuctions {
     struct Offer {
         address tokenContract;
         uint256 tokenId;
-        uint256 amount;
         address from;
+        uint256 amount;
+        uint256 timestamp;
     }
 
     event HouseCreated(
@@ -166,7 +167,7 @@ interface IAuctions {
 
     event AuctionBid(
         uint256 indexed auctionId,
-        address bidder,
+        address indexed bidder,
         uint256 value,
         bool    firstBid,
         bool    extended
@@ -195,9 +196,21 @@ interface IAuctions {
 
     function totalCollectors() external view returns (uint256);
 
+    function totalActiveHouses() external view returns (uint256);
+
     function totalActiveAuctions() external view returns (uint256);
 
     function totalActiveHouseAuctions(uint256 houseId) external view returns (uint256);
+
+    function getActiveHouses(uint256 from, uint256 n) external view returns (uint256[] memory);
+
+    function getRankedHouses(uint256 from, uint256 n) external view returns (uint256[] memory);
+
+    function getRankedCreators(address from, uint256 n) external view returns (address[] memory);
+
+    function getRankedCollectors(address from, uint256 n) external view returns (address[] memory);
+
+    function getRankedContracts(address from, uint256 n) external view returns (address[] memory);
 
     function getAuctions() external view returns (uint256[] memory);
 
@@ -227,12 +240,11 @@ interface IAuctions {
 
     function registerTokenContract(
         address tokenContract
-    ) external returns (uint256);
+    ) external;
 
     function makeOffer(
         address tokenContract,
-        uint256 tokenId,
-        uint256 amount
+        uint256 tokenId
     ) external payable;
 
     function acceptOffer(
@@ -302,15 +314,34 @@ interface IAuctions {
     ) external;
 
     function createBid(
-        uint256 auctionId,
-        uint256 amount
+        uint256 auctionId
     ) external payable;
 
     function endAuction(
         uint256 auctionId
     ) external;
 
+    function buyAuction(
+      uint256 auctionId
+    ) external payable;
+
     function cancelAuction(
         uint256 auctionId
+    ) external;
+
+    function updateHouseRank(
+        uint256 houseId
+    ) external;
+
+    function updateCreatorRank(
+        address creator
+    ) external;
+
+    function updateCollectorRank(
+        address collector
+    ) external;
+
+    function updateContractRank(
+        address tokenContract
     ) external;
 }

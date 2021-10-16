@@ -1,17 +1,17 @@
 
 import '@typechain/hardhat'
 import '@nomiclabs/hardhat-waffle'
-import "@nomiclabs/hardhat-etherscan"
+import '@nomiclabs/hardhat-etherscan'
 
-import "solidity-coverage"
-import "hardhat-gas-reporter"
-import "hardhat-abi-exporter"
+import 'solidity-coverage'
+import 'hardhat-gas-reporter'
+import 'hardhat-abi-exporter'
 
-import { task } from "hardhat/config"
+import { task } from 'hardhat/config'
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
-task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
+task('accounts', 'Prints the list of accounts', async (taskArgs, hre) => {
   const accounts = await hre.ethers.getSigners()
 
   for (const account of accounts)
@@ -26,10 +26,10 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
  */
 
 module.exports = {
-  defaultNetwork: "hardhat",
+  defaultNetwork: 'hardhat',
   networks: {
     localhost: {
-      url: "http://127.0.0.1:8545"
+      url: 'http://127.0.0.1:8545'
     },
     hardhat: {
       gasPrice: 75000000000,
@@ -39,20 +39,20 @@ module.exports = {
       //   interval: 1000
       // },
       // forking: {
-      //   url: "https://eth-mainnet.alchemyapi.io/v2/Z8JNiWNLZTHZoKDcy3F35IvyMw7CPOM9",
+      //   url: 'https://eth-mainnet.alchemyapi.io/v2/Z8JNiWNLZTHZoKDcy3F35IvyMw7CPOM9',
       // }
     },
     mainnet: {
       chainId: 1,
-      url: "https://mainnet.infura.io/v3/94d0e160138c4b2b8dda74c503432245",
+      url: 'https://mainnet.infura.io/v3/94d0e160138c4b2b8dda74c503432245',
       // accounts: [privateKey1, privateKey2, ...]
     }
   },
   etherscan: {
-    apiKey: "TAKHV99M3FA3878H8KV9W9T9XIW9SR2C2F"
+    apiKey: 'TAKHV99M3FA3878H8KV9W9T9XIW9SR2C2F'
   },
   solidity: {
-    version: "0.8.7",
+    version: '0.8.9',
     settings: {
       optimizer: {
         enabled: true,

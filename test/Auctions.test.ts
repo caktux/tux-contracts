@@ -335,7 +335,7 @@ describe("Auctions", () => {
           0
         )
       ).eventually.rejectedWith(
-        revert`Token contract does not support ERC721 interface`
+        revert`Token contract does not support the ERC721 interface`
       )
     })
 
@@ -478,7 +478,7 @@ describe("Auctions", () => {
       await auctions.connect(curator).setAuctionApproval(1, true)
       await auctions
         .connect(bidder)
-        .createBid(1, ONE_ETH, { value: ONE_ETH })
+        .createBid(1, { value: ONE_ETH })
       await expect(
         auctions.connect(curator).setAuctionApproval(1, false)
       ).eventually.rejectedWith(revert`Auction has already started`)
@@ -550,7 +550,7 @@ describe("Auctions", () => {
       // await auctions.setAuctionApproval(1, true)
       await auctions
         .connect(bidder)
-        .createBid(1, TWO_ETH, { value: TWO_ETH })
+        .createBid(1,{ value: TWO_ETH })
       await expect(
         auctions.connect(creator).setAuctionReservePrice(1, ONE_ETH)
       ).eventually.rejectedWith(revert`Auction has already started`)
@@ -598,45 +598,35 @@ describe("Auctions", () => {
 
     it("should revert if the specified auction does not exist", async () => {
       await expect(
-        auctions.createBid(11111, ONE_ETH)
+        auctions.createBid(11111)
       ).eventually.rejectedWith(revert`Auction does not exist`)
     })
 
     it("should revert if the specified auction is not approved", async () => {
       await auctions.connect(curator).setAuctionApproval(1, false)
       await expect(
-        auctions.createBid(1, ONE_ETH, { value: ONE_ETH })
+        auctions.createBid(1, { value: ONE_ETH })
       ).eventually.rejectedWith(revert`Auction must be approved by curator`)
     })
 
     it("should revert if the bid is less than the reserve price", async () => {
       await expect(
-        auctions.createBid(1, 0, { value: 0 })
+        auctions.createBid(1, { value: 0 })
       ).eventually.rejectedWith(revert`Bid below reserve price`)
-    })
-
-    it("should revert if msg.value does not equal specified amount", async () => {
-      await expect(
-        auctions.createBid(1, ONE_ETH, {
-          value: ONE_ETH.mul(2),
-        })
-      ).eventually.rejectedWith(
-        revert`Sent ETH does not match specified bid amount`
-      )
     })
 
     describe("first bid", () => {
       it("should set the first bid time", async () => {
         // TODO: Fix this test on Sun Oct 04 2274
         await ethers.provider.send("evm_setNextBlockTimestamp", [9617249934])
-        await auctions.createBid(1, ONE_ETH, {
+        await auctions.createBid(1, {
           value: ONE_ETH,
         })
         expect((await auctions.auctions(1)).firstBidTime).to.eq(9617249934)
       })
 
       it("should store the transferred ETH", async () => {
-        await auctions.createBid(1, ONE_ETH, {
+        await auctions.createBid(1, {
           value: ONE_ETH,
         })
         expect(await ethers.provider.getBalance(auctions.address)).to.eq(ONE_ETH)
@@ -644,7 +634,7 @@ describe("Auctions", () => {
 
       it("should not update the auction's duration", async () => {
         const beforeDuration = (await auctions.auctions(1)).duration
-        await auctions.createBid(1, ONE_ETH, {
+        await auctions.createBid(1, {
           value: ONE_ETH,
         })
         const afterDuration = (await auctions.auctions(1)).duration
@@ -668,14 +658,14 @@ describe("Auctions", () => {
           1
         )
 
-        await auctions.createBid(2, ONE_ETH, { value: ONE_ETH })
+        await auctions.createBid(2, { value: ONE_ETH })
         const afterDuration = (await auctions.auctions(2)).duration
 
         expect(afterDuration).to.eq(duration)
       })
 
       it("should store the bidder's information", async () => {
-        await auctions.connect(bidderA).createBid(1, ONE_ETH, {
+        await auctions.connect(bidderA).createBid(1, {
           value: ONE_ETH,
         })
         const currAuction = await auctions.auctions(1)
@@ -686,7 +676,7 @@ describe("Auctions", () => {
 
       it("should emit an AuctionBid event", async () => {
         const block = await ethers.provider.getBlockNumber()
-        await auctions.connect(bidderA).createBid(1, ONE_ETH, {
+        await auctions.connect(bidderA).createBid(1, {
           value: ONE_ETH,
         })
         const events = await auctions.queryFilter(
@@ -715,12 +705,12 @@ describe("Auctions", () => {
         auctions = auctions.connect(bidderB)
         await auctions
           .connect(bidderA)
-          .createBid(1, ONE_ETH, { value: ONE_ETH })
+          .createBid(1, { value: ONE_ETH })
       })
 
       it("should revert if the bid is smaller than the last bid + minBid", async () => {
         await expect(
-          auctions.createBid(1, ONE_ETH.add(1), {
+          auctions.createBid(1, {
             value: ONE_ETH.add(1),
           })
         ).eventually.rejectedWith(
@@ -733,7 +723,7 @@ describe("Auctions", () => {
           await bidderA.getAddress()
         )
         const beforeBidAmount = (await auctions.auctions(1)).amount
-        await auctions.createBid(1, TWO_ETH, {
+        await auctions.createBid(1, {
           value: TWO_ETH,
         })
         const afterBalance = await ethers.provider.getBalance(
@@ -745,7 +735,7 @@ describe("Auctions", () => {
 
       it("should not update the firstBidTime", async () => {
         const firstBidTime = (await auctions.auctions(1)).firstBidTime
-        await auctions.createBid(1, TWO_ETH, {
+        await auctions.createBid(1, {
           value: TWO_ETH,
         })
 
@@ -755,7 +745,7 @@ describe("Auctions", () => {
       })
 
       it("should transfer the bid to the contract and store the ETH", async () => {
-        await auctions.createBid(1, TWO_ETH, {
+        await auctions.createBid(1, {
           value: TWO_ETH,
         })
 
@@ -763,7 +753,7 @@ describe("Auctions", () => {
       })
 
       it("should update the stored bid information", async () => {
-        await auctions.createBid(1, TWO_ETH, {
+        await auctions.createBid(1, {
           value: TWO_ETH,
         })
 
@@ -775,7 +765,7 @@ describe("Auctions", () => {
 
       it("should not extend the duration of the bid if outside of the time buffer", async () => {
         const beforeDuration = (await auctions.auctions(1)).duration
-        await auctions.createBid(1, TWO_ETH, {
+        await auctions.createBid(1, {
           value: TWO_ETH,
         })
         const afterDuration = (await auctions.auctions(1)).duration
@@ -785,7 +775,7 @@ describe("Auctions", () => {
 
       it("should emit an AuctionBid event", async () => {
         const block = await ethers.provider.getBlockNumber()
-        await auctions.createBid(1, TWO_ETH, {
+        await auctions.createBid(1, {
           value: TWO_ETH,
         })
         const events = await auctions.queryFilter(
@@ -821,7 +811,7 @@ describe("Auctions", () => {
 
         it("should extend the duration of the bid if inside of the time buffer", async () => {
           const beforeDuration = (await auctions.auctions(1)).duration
-          await auctions.createBid(1, TWO_ETH, {
+          await auctions.createBid(1, {
             value: TWO_ETH,
           })
 
@@ -833,7 +823,7 @@ describe("Auctions", () => {
 
         it("should emit an AuctionBid event", async () => {
           const block = await ethers.provider.getBlockNumber()
-          await auctions.createBid(1, TWO_ETH, {
+          await auctions.createBid(1, {
             value: TWO_ETH,
           })
           const events = await auctions.queryFilter(
@@ -870,7 +860,7 @@ describe("Auctions", () => {
 
         it("should revert if the bid is placed after expiry", async () => {
           await expect(
-            auctions.createBid(1, TWO_ETH, {
+            auctions.createBid(1, {
               value: TWO_ETH,
             })
           ).eventually.rejectedWith(revert`Auction expired`)
@@ -924,7 +914,7 @@ describe("Auctions", () => {
     it("should revert if the auction has already begun", async () => {
       await auctions
         .connect(bidder)
-        .createBid(1, ONE_ETH, { value: ONE_ETH })
+        .createBid(1, { value: ONE_ETH })
       await expect(
         auctions.connect(creator).cancelAuction(1)
       ).eventually.rejectedWith(
@@ -999,7 +989,7 @@ describe("Auctions", () => {
     })
 
     it("should revert if the auction has not completed", async () => {
-      await auctions.createBid(1, ONE_ETH, {
+      await auctions.createBid(1, {
         value: ONE_ETH,
       })
 
@@ -1009,7 +999,7 @@ describe("Auctions", () => {
     })
 
     it("should cancel the auction if the winning bidder is unable to receive NFTs", async () => {
-      await badBidder.placeBid(1, TWO_ETH, { value: TWO_ETH })
+      await badBidder.placeBid(1, { value: TWO_ETH })
       const endTime =
         (await auctions.auctions(1)).duration.toNumber() +
         (await auctions.auctions(1)).firstBidTime.toNumber()
@@ -1027,7 +1017,7 @@ describe("Auctions", () => {
       beforeEach(async () => {
         await auctions
           .connect(bidder)
-          .createBid(1, ONE_ETH, { value: ONE_ETH })
+          .createBid(1, { value: ONE_ETH })
         const endTime =
           (await auctions.auctions(1)).duration.toNumber() +
           (await auctions.auctions(1)).firstBidTime.toNumber()

@@ -10,19 +10,19 @@ import "@openzeppelin/contracts/utils/Counters.sol";
  * and can be enumerated. Values can be inserted and removed from anywhere. Add, append, remove and
  * contains are O(1). Enumerate is O(N).
  */
-library OrderedSet {
+library OrderedAddressSet {
     using Counters for Counters.Counter;
 
     struct Set {
         Counters.Counter counter;
-        mapping (uint256 => uint256) _next;
-        mapping (uint256 => uint256) _prev;
+        mapping (address => address) _next;
+        mapping (address => address) _prev;
     }
 
     /**
      * @dev Insert a value between two values
      */
-    function insert(Set storage set, uint256 prev_, uint256 value, uint256 next_) internal {
+    function insert(Set storage set, address prev_, address value, address next_) internal {
         set._next[prev_] = value;
         set._next[value] = next_;
         set._prev[next_] = value;
@@ -33,21 +33,21 @@ library OrderedSet {
     /**
      * @dev Insert a value as the new head
      */
-    function add(Set storage set, uint256 value) internal {
-        insert(set, 0, value, set._next[0]);
+    function add(Set storage set, address value) internal {
+        insert(set, address(0), value, set._next[address(0)]);
     }
 
     /**
      * @dev Insert a value as the new tail
      */
-    function append(Set storage set, uint256 value) internal {
-        insert(set, set._prev[0], value, 0);
+    function append(Set storage set, address value) internal {
+        insert(set, set._prev[address(0)], value, address(0));
     }
 
     /**
      * @dev Remove a value
      */
-    function remove(Set storage set, uint256 value) internal {
+    function remove(Set storage set, address value) internal {
         set._next[set._prev[value]] = set._next[value];
         set._prev[set._next[value]] = set._prev[value];
         delete set._next[value];
@@ -58,15 +58,15 @@ library OrderedSet {
     /**
      * @dev Returns the head
      */
-    function head(Set storage set) internal view returns (uint256) {
-        return set._next[0];
+    function head(Set storage set) internal view returns (address) {
+        return set._next[address(0)];
     }
 
     /**
      * @dev Returns the tail
      */
-    function tail(Set storage set) internal view returns (uint256) {
-        return set._prev[0];
+    function tail(Set storage set) internal view returns (address) {
+        return set._prev[address(0)];
     }
 
     /**
@@ -79,24 +79,24 @@ library OrderedSet {
     /**
      * @dev Returns the next value
      */
-    function next(Set storage set, uint256 _value) internal view returns (uint256) {
+    function next(Set storage set, address _value) internal view returns (address) {
         return set._next[_value];
     }
 
     /**
      * @dev Returns the previous value
      */
-    function prev(Set storage set, uint256 _value) internal view returns (uint256) {
+    function prev(Set storage set, address _value) internal view returns (address) {
         return set._prev[_value];
     }
 
     /**
      * @dev Returns true if the value is in the set
      */
-    function contains(Set storage set, uint256 value) internal view returns (bool) {
-        return set._next[0] == value ||
-               set._next[value] != 0 ||
-               set._prev[value] != 0;
+    function contains(Set storage set, address value) internal view returns (bool) {
+        return set._next[address(0)] == value ||
+               set._next[value] != address(0) ||
+               set._prev[value] != address(0);
     }
 
     /**
@@ -107,11 +107,11 @@ library OrderedSet {
      * this function has an unbounded cost, and using it as part of a state-changing function may render the function
      * uncallable if the set grows to a point where copying to memory consumes too much gas to fit in a block.
      */
-    function values(Set storage set) internal view returns (uint256[] memory) {
-        uint256[] memory _values = new uint256[](set.counter.current());
-        uint256 value = set._next[0];
+    function values(Set storage set) internal view returns (address[] memory) {
+        address[] memory _values = new address[](set.counter.current());
+        address value = set._next[address(0)];
         uint256 i = 0;
-        while (value != 0) {
+        while (value != address(0)) {
             _values[i] = value;
             value = set._next[value];
             i += 1;
@@ -122,9 +122,9 @@ library OrderedSet {
     /**
      * @dev Return an array with n values in the set, starting after "from"
      */
-    function valuesFromN(Set storage set, uint256 from, uint256 n) internal view returns (uint256[] memory) {
-        uint256[] memory _values = new uint256[](n);
-        uint256 value = set._next[from];
+    function valuesFromN(Set storage set, address from, uint256 n) internal view returns (address[] memory) {
+        address[] memory _values = new address[](n);
+        address value = set._next[from];
         uint256 i = 0;
         while (i < n) {
             _values[i] = value;
