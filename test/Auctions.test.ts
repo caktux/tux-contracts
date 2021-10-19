@@ -12,6 +12,7 @@ import { Auctions, BadBidder, TestERC721, BadERC721 } from "../typechain"
 import {
   approveAuctions,
   deployTux,
+  deployTuxERC20,
   deployBidder,
   deployOtherNFTs,
   mint,
@@ -27,12 +28,14 @@ chai.use(asPromised)
 
 describe("Auctions", () => {
   let tux: any
+  let tuxERC20: any
   let badERC721: BadERC721
   let testERC721: TestERC721
 
   beforeEach(async () => {
     // await ethers.provider.send("hardhat_reset", []);
     tux = await deployTux()
+    tuxERC20 = await deployTuxERC20()
     const nfts = await deployOtherNFTs()
     badERC721 = nfts.bad
     testERC721 = nfts.test
@@ -40,7 +43,9 @@ describe("Auctions", () => {
 
   async function deploy(): Promise<Auctions> {
     const Auctions = await ethers.getContractFactory('contracts/Auctions.sol:Auctions')
-    const auctions = await Auctions.deploy()
+    const auctions = await Auctions.deploy(tuxERC20.address)
+
+    await tuxERC20.setMinter(auctions.address)
 
     return auctions as Auctions
   }
@@ -82,7 +87,7 @@ describe("Auctions", () => {
   describe("#constructor", () => {
     it("should be able to deploy", async () => {
       const Auctions = await ethers.getContractFactory('contracts/Auctions.sol:Auctions')
-      const auctions = await Auctions.deploy()
+      const auctions = await Auctions.deploy(tuxERC20.address)
 
       expect(await auctions.timeBuffer()).to.eq(
         900,
@@ -141,7 +146,7 @@ describe("Auctions", () => {
       await expect(
         createHouse(auctions, await curator.getAddress(), 100, true, houseName)
       ).eventually.rejectedWith(
-        revert`House name must be less than 32 characters`
+        revert`Name too long`
       )
     })
 
@@ -151,7 +156,7 @@ describe("Auctions", () => {
       await expect(
         createHouse(auctions, await curator.getAddress())
       ).eventually.rejectedWith(
-        revert`House name already exists`
+        revert`Already exists`
       )
     })
 
@@ -160,7 +165,7 @@ describe("Auctions", () => {
       await expect(
         createHouse(auctions, await curator.getAddress(), 10000, true, 'Other house')
       ).eventually.rejectedWith(
-        revert`Curator fee percentage must be less than 100%`)
+        revert`Fee too high`)
     })
 
     it('should add a creator', async () => {
@@ -179,7 +184,7 @@ describe("Auctions", () => {
       await expect(
         auctions.connect(creator).addCreator(1, await creator.getAddress())
       ).eventually.rejectedWith(
-        revert`Must be house curator`
+        revert`Not house curator`
       )
     })
 
@@ -200,7 +205,7 @@ describe("Auctions", () => {
       await expect(
         auctions.connect(creator).removeCreator(1, await creator.getAddress())
       ).eventually.rejectedWith(
-        revert`Must be house curator`
+        revert`Not house curator`
       )
     })
 
@@ -220,7 +225,7 @@ describe("Auctions", () => {
       await expect(
         auctions.connect(creator).updateFee(1, 0)
       ).eventually.rejectedWith(
-        revert`Must be house curator`
+        revert`Not house curator`
       )
     })
 
@@ -229,7 +234,7 @@ describe("Auctions", () => {
       await expect(
         auctions.connect(curator).updateFee(1, 10000)
       ).eventually.rejectedWith(
-        revert`Curator fee percentage must be less than 100%`)
+        revert`Fee too high`)
     })
 
     it('should update house metadata', async () => {
@@ -248,7 +253,7 @@ describe("Auctions", () => {
       await expect(
         auctions.connect(creator).updateMetadata(1, TOKEN_URI)
       ).eventually.rejectedWith(
-        revert`Must be house curator`
+        revert`Not house curator`
       )
     })
 
@@ -335,7 +340,7 @@ describe("Auctions", () => {
           0
         )
       ).eventually.rejectedWith(
-        revert`Token contract does not support the ERC721 interface`
+        revert`Does not support ERC721`
       )
     })
 
@@ -354,7 +359,7 @@ describe("Auctions", () => {
             0
           )
       ).eventually.rejectedWith(
-        revert`Must be token owner or approved`
+        revert`Not owner or approved`
       )
     })
 
@@ -382,7 +387,7 @@ describe("Auctions", () => {
       await expect(
         createAuction(auctions, 1)
       ).eventually.rejectedWith(
-        revert`Must be approved by the house`)
+        revert`Not approved by curator`)
     })
 
     it("should create an auction", async () => {
@@ -465,13 +470,13 @@ describe("Auctions", () => {
     it("should revert if the auction does not exist", async () => {
       await expect(
         auctions.setAuctionApproval(2, true)
-      ).eventually.rejectedWith(revert`Auction does not exist`)
+      ).eventually.rejectedWith(revert`Does not exist`)
     })
 
     it("should revert if not called by the curator", async () => {
       await expect(
         auctions.connect(bidder).setAuctionApproval(1, true)
-      ).eventually.rejectedWith(revert`Must be auction curator`)
+      ).eventually.rejectedWith(revert`Not auction curator`)
     })
 
     it("should revert if the auction has already started", async () => {
@@ -481,7 +486,7 @@ describe("Auctions", () => {
         .createBid(1, { value: ONE_ETH })
       await expect(
         auctions.connect(curator).setAuctionApproval(1, false)
-      ).eventually.rejectedWith(revert`Auction has already started`)
+      ).eventually.rejectedWith(revert`Already started`)
     })
 
     it("should set the auction as approved", async () => {
@@ -530,19 +535,19 @@ describe("Auctions", () => {
     it("should revert if the auctions does not exist", async () => {
       await expect(
         auctions.connect(creator).setAuctionReservePrice(2, TWO_ETH)
-      ).eventually.rejectedWith(revert`Auction does not exist`)
+      ).eventually.rejectedWith(revert`Does not exist`)
     })
 
     it("should revert if not called by the owner", async () => {
       await expect(
         auctions.connect(admin).setAuctionReservePrice(1, TWO_ETH)
-      ).eventually.rejectedWith(revert`Must be token owner`)
+      ).eventually.rejectedWith(revert`Not token owner`)
     })
 
     it("should revert when called by the curator", async () => {
       await expect(
         auctions.connect(curator).setAuctionReservePrice(1, TWO_ETH)
-      ).eventually.rejectedWith(revert`Must be token owner`)
+      ).eventually.rejectedWith(revert`Not token owner`)
     })
 
     it("should revert if the auction has already started", async () => {
@@ -553,7 +558,7 @@ describe("Auctions", () => {
         .createBid(1,{ value: TWO_ETH })
       await expect(
         auctions.connect(creator).setAuctionReservePrice(1, ONE_ETH)
-      ).eventually.rejectedWith(revert`Auction has already started`)
+      ).eventually.rejectedWith(revert`Already started`)
     })
 
     it("should set the auction reserve price when called by the token owner", async () => {
@@ -599,14 +604,14 @@ describe("Auctions", () => {
     it("should revert if the specified auction does not exist", async () => {
       await expect(
         auctions.createBid(11111)
-      ).eventually.rejectedWith(revert`Auction does not exist`)
+      ).eventually.rejectedWith(revert`Does not exist`)
     })
 
     it("should revert if the specified auction is not approved", async () => {
       await auctions.connect(curator).setAuctionApproval(1, false)
       await expect(
         auctions.createBid(1, { value: ONE_ETH })
-      ).eventually.rejectedWith(revert`Auction must be approved by curator`)
+      ).eventually.rejectedWith(revert`Not approved by curator`)
     })
 
     it("should revert if the bid is less than the reserve price", async () => {
@@ -708,13 +713,13 @@ describe("Auctions", () => {
           .createBid(1, { value: ONE_ETH })
       })
 
-      it("should revert if the bid is smaller than the last bid + minBid", async () => {
+      it("should revert if the bid is smaller than the minimum bid", async () => {
         await expect(
           auctions.createBid(1, {
             value: ONE_ETH.add(1),
           })
         ).eventually.rejectedWith(
-          revert`Must send more than last bid by 5%`
+          revert`Amount too low`
         )
       })
 
@@ -891,7 +896,7 @@ describe("Auctions", () => {
 
     it("should revert if the auction does not exist", async () => {
       await expect(auctions.cancelAuction(2)).eventually.rejectedWith(
-        revert`Auction does not exist`
+        revert`Does not exist`
       )
     })
 
@@ -899,7 +904,7 @@ describe("Auctions", () => {
       await expect(
         auctions.connect(bidder).cancelAuction(1)
       ).eventually.rejectedWith(
-        `Can only be called by auction creator`
+        `Not auction owner`
       )
     })
 
@@ -907,7 +912,7 @@ describe("Auctions", () => {
       await expect(
         auctions.connect(curator).cancelAuction(1)
       ).eventually.rejectedWith(
-        `Can only be called by auction creator`
+        `Not auction owner`
       )
     })
 
@@ -918,7 +923,7 @@ describe("Auctions", () => {
       await expect(
         auctions.connect(creator).cancelAuction(1)
       ).eventually.rejectedWith(
-        revert`Cannot cancel an auction once it has begun`
+        revert`Already started`
       )
     })
 
@@ -978,23 +983,23 @@ describe("Auctions", () => {
 
     it("should revert if the auction does not exist", async () => {
       await expect(auctions.endAuction(2)).eventually.rejectedWith(
-        revert`Auction does not exist`
+        revert`Does not exist`
       )
     })
 
     it("should revert if the auction has not begun", async () => {
       await expect(auctions.endAuction(1)).eventually.rejectedWith(
-        revert`Auction not started`
+        revert`Not started`
       )
     })
 
-    it("should revert if the auction has not completed", async () => {
+    it("should revert if the auction has not ended", async () => {
       await auctions.createBid(1, {
         value: ONE_ETH,
       })
 
       await expect(auctions.endAuction(1)).eventually.rejectedWith(
-        revert`Auction not completed`
+        revert`Not ended`
       )
     })
 

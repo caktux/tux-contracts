@@ -3,6 +3,7 @@
 pragma solidity 0.8.9;
 
 import { ITux } from "./ITux.sol";
+import { ITuxERC20 } from "./ITuxERC20.sol";
 import { IAuctions } from "./IAuctions.sol";
 
 import "./library/UintSet.sol";
@@ -10,8 +11,6 @@ import "./library/AddressSet.sol";
 import "./library/OrderedSet.sol";
 import "./library/RankedSet.sol";
 import "./library/RankedAddressSet.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import { IERC721, IERC165 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { IERC721Metadata } from "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
@@ -21,18 +20,19 @@ contract Auctions is
     IAuctions,
     ReentrancyGuard
 {
-    using SafeMath for uint256;
     using UintSet for UintSet.Set;
     using RankedSet for RankedSet.Set;
     using RankedAddressSet for RankedAddressSet.Set;
     using AddressSet for AddressSet.Set;
     using OrderedSet for OrderedSet.Set;
-    using Counters for Counters.Counter;
 
-    Counters.Counter private _bidIdTracker;
-    Counters.Counter private _offerIdTracker;
-    Counters.Counter private _houseIdTracker;
-    Counters.Counter private _auctionIdTracker;
+    uint256 private _lastBidId;
+    uint256 private _lastOfferId;
+    uint256 private _lastHouseId;
+    uint256 private _lastAuctionId;
+
+    // TuxERC20 contract address
+    address public tuxERC20;
 
     // Minimum amount of time left in seconds to an auction after a new bid is placed
     uint256 constant public timeBuffer = 900;  // 15 minutes -> 900 seconds
@@ -127,14 +127,14 @@ contract Auctions is
     modifier auctionExists(uint256 auctionId) {
         require(
             auctions[auctionId].tokenOwner != address(0),
-            "Auction does not exist");
+            "Does not exist");
         _;
     }
 
     modifier onlyHouseCurator(uint256 houseId) {
         require(
             msg.sender == houses[houseId].curator,
-            "Must be house curator");
+            "Not house curator");
         _;
     }
 
@@ -142,14 +142,18 @@ contract Auctions is
     /*
      * Constructor
      */
-    /* constructor() {} */
+    constructor(
+        address tuxERC20_
+    ) {
+        tuxERC20 = tuxERC20_;
+    }
 
     function totalHouses() public view override returns (uint256) {
-        return _houseIdTracker.current();
+        return _lastHouseId;
     }
 
     function totalAuctions() public view override returns (uint256) {
-        return _auctionIdTracker.current();
+        return _lastAuctionId;
     }
 
     function totalContracts() public view override returns (uint256) {
@@ -259,42 +263,41 @@ contract Auctions is
         public
         override
         nonReentrant
-        returns (uint256)
     {
         require(
             houseIDs[name] == 0,
-            "House name already exists");
+            "Already exists");
         require(
             bytes(name).length > 0,
-            "House name is required");
+            "Name required");
         require(
             bytes(name).length <= 32,
-            "House name must be less than 32 characters");
+            "Name too long");
         require(
             curator != address(0),
-            "Curator address is required");
+            "Address required");
         require(
             fee < 10000,
-            "Curator fee percentage must be less than 100%");
+            "Fee too high");
 
-        _houseIdTracker.increment();
-        uint256 houseId = _houseIdTracker.current();
+        _lastHouseId += 1;
 
-        houses[houseId].name = name;
-        houses[houseId].curator = payable(curator);
-        houses[houseId].fee = fee;
-        houses[houseId].preApproved = preApproved;
-        houses[houseId].metadata = metadata;
+        houses[_lastHouseId].name = name;
+        houses[_lastHouseId].curator = payable(curator);
+        houses[_lastHouseId].fee = fee;
+        houses[_lastHouseId].preApproved = preApproved;
+        houses[_lastHouseId].metadata = metadata;
 
-        _curatorHouses[curator].add(houseId);
-        _rankedHouses.add(houseId);
-        houseIDs[name] = houseId;
+        _curatorHouses[curator].add(_lastHouseId);
+        _rankedHouses.add(_lastHouseId);
+        houseIDs[name] = _lastHouseId;
+
+        ITuxERC20(tuxERC20).updateFeatured();
+        ITuxERC20(tuxERC20).mint(msg.sender, 5 * 10**18);
 
         emit HouseCreated(
-            houseId
+            _lastHouseId
         );
-
-        return houseId;
     }
 
     function addCreator(
@@ -307,10 +310,12 @@ contract Auctions is
     {
         require(
             _houseCreators[houseId].contains(creator) == false,
-            "Creator already added");
+            "Already added");
 
         _houseCreators[houseId].add(creator);
         _creatorHouses[creator].add(houseId);
+
+        ITuxERC20(tuxERC20).mint(msg.sender, 1 * 10**18);
 
         emit CreatorAdded(
             houseId,
@@ -328,7 +333,7 @@ contract Auctions is
     {
         require(
             _houseCreators[houseId].contains(creator) == true,
-            "Creator already removed");
+            "Already removed");
 
         _houseCreators[houseId].remove(creator);
         _creatorHouses[creator].remove(houseId);
@@ -349,7 +354,7 @@ contract Auctions is
     {
         require(
             fee < 10000,
-            "Curator fee percentage must be less than 100%");
+            "Fee too high");
 
         houses[houseId].fee = fee;
 
@@ -424,7 +429,6 @@ contract Auctions is
         public
         override
         nonReentrant
-        returns (uint256)
     {
         if (contracts[tokenContract].tokenContract == address(0)) {
             registerTokenContract(tokenContract);
@@ -434,7 +438,7 @@ contract Auctions is
         require(
             msg.sender == tokenOwner ||
             msg.sender == IERC721(tokenContract).getApproved(tokenId),
-            "Must be token owner or approved");
+            "Not owner or approved");
 
         uint16  fee = 0;
         bool    preApproved = true;
@@ -448,7 +452,7 @@ contract Auctions is
                 "House does not exist");
             require(
                 _houseCreators[houseId].contains(tokenOwner) || msg.sender == curator,
-                "Must be approved by the house");
+                "Not approved by curator");
 
             fee = houses[houseId].fee;
             preApproved = houses[houseId].preApproved;
@@ -461,18 +465,17 @@ contract Auctions is
             }
         } catch {}
 
-        _auctionIdTracker.increment();
-        uint256 auctionId = _auctionIdTracker.current();
+        _lastAuctionId += 1;
 
-        tokenAuction[keccak256(abi.encode(tokenContract, tokenId))] = auctionId;
+        tokenAuction[keccak256(abi.encode(tokenContract, tokenId))] = _lastAuctionId;
 
-        _sellerAuctions[tokenOwner].add(auctionId);
+        _sellerAuctions[tokenOwner].add(_lastAuctionId);
 
         bool approved = (curator == address(0) || preApproved || curator == tokenOwner);
 
         if (houseId > 0) {
             if (approved == true) {
-                _houseAuctions[houseId].add(auctionId);
+                _houseAuctions[houseId].add(_lastAuctionId);
                 if (_activeHouses.head() != houseId) {
                     if (_activeHouses.contains(houseId)) {
                         _activeHouses.remove(houseId);
@@ -481,14 +484,14 @@ contract Auctions is
                 }
             }
             else {
-                _houseQueue[houseId].add(auctionId);
+                _houseQueue[houseId].add(_lastAuctionId);
             }
         }
         else {
-            _activeAuctions.add(auctionId);
+            _activeAuctions.add(_lastAuctionId);
         }
 
-        auctions[auctionId] = Auction({
+        auctions[_lastAuctionId] = Auction({
             tokenContract: tokenContract,
             tokenId: tokenId,
             tokenOwner: tokenOwner,
@@ -505,11 +508,12 @@ contract Auctions is
 
         IERC721(tokenContract).transferFrom(tokenOwner, address(this), tokenId);
 
-        emit AuctionCreated(
-            auctionId
-        );
+        ITuxERC20(tuxERC20).updateFeatured();
+        ITuxERC20(tuxERC20).mint(msg.sender, 10 * 10**18);
 
-        return auctionId;
+        emit AuctionCreated(
+            _lastAuctionId
+        );
     }
 
     function setAuctionApproval(uint256 auctionId, bool approved)
@@ -521,15 +525,15 @@ contract Auctions is
         address curator = houses[auction.houseId].curator;
 
         require(
-            curator != address(0) && curator == msg.sender,
-            "Must be auction curator");
+            curator == msg.sender,
+            "Not auction curator");
         require(
             auction.firstBidTime == 0,
-            "Auction has already started");
+            "Already started");
         require(
             (approved == true && auction.approved == false) ||
             (approved == false && auction.approved == true),
-            "Auction already in this approved state");
+            "Already in this state");
 
         auction.approved = approved;
 
@@ -560,10 +564,10 @@ contract Auctions is
 
         require(
             msg.sender == auction.tokenOwner,
-            "Must be token owner");
+            "Not token owner");
         require(
             auction.firstBidTime == 0,
-            "Auction has already started");
+            "Already started");
 
         auction.reservePrice = reservePrice;
 
@@ -584,15 +588,15 @@ contract Auctions is
 
         require(
             auction.approved,
-            "Auction must be approved by curator");
+            "Not approved by curator");
         require(
             auction.firstBidTime == 0 ||
-            block.timestamp < auction.firstBidTime.add(auction.duration),
+            block.timestamp < auction.firstBidTime + auction.duration,
             "Auction expired");
         require(
-            msg.value >= auction.amount.add(
-                auction.amount.mul(minimumIncrementPercentage).div(10000)),
-            "Must send more than last bid by 5%");
+            msg.value >= auction.amount + (
+                auction.amount * minimumIncrementPercentage / 10000),
+            "Amount too low");
         require(
             msg.value >= auction.reservePrice,
             "Bid below reserve price");
@@ -613,16 +617,15 @@ contract Auctions is
         auction.bidder = payable(msg.sender);
 
         if (auction.duration > 0) {
-            _bidIdTracker.increment();
-            uint256 bidId = _bidIdTracker.current();
+            _lastBidId += 1;
 
-            bids[bidId] = Bid({
+            bids[_lastBidId] = Bid({
                 timestamp: block.timestamp,
                 bidder: msg.sender,
                 value: msg.value
             });
 
-            _auctionBids[auctionId].add(bidId);
+            _auctionBids[auctionId].add(_lastBidId);
             _bidderAuctions[msg.sender].add(auctionId);
         }
 
@@ -640,9 +643,8 @@ contract Auctions is
         collectorStats[msg.sender].bids += 1;
 
         if (auction.houseId > 0) {
-            /* uint256 _bids = houses[auction.houseId].bids; // This gets too expensive... */
             houses[auction.houseId].bids += 1;
-            /* _rankedHouses.rankScore(auction.houseId, _bids, houses[auction.houseId].bids); */
+            /* _rankedHouses.rankScore(auction.houseId, houses[auction.houseId].bids); // This gets too expensive... */
 
             _houseAuctions[auction.houseId].remove(auctionId);
             _houseAuctions[auction.houseId].add(auctionId);
@@ -650,12 +652,15 @@ contract Auctions is
 
         bool extended = false;
         if (auction.duration > 0) {
-          uint256 timeRemaining = auction.firstBidTime.add(auction.duration).sub(block.timestamp);
+          uint256 timeRemaining = auction.firstBidTime + auction.duration - block.timestamp;
           if (timeRemaining < timeBuffer) {
-              auction.duration += timeBuffer.sub(timeRemaining);
+              auction.duration += timeBuffer - timeRemaining;
               extended = true;
           }
         }
+
+        ITuxERC20(tuxERC20).updateFeatured();
+        ITuxERC20(tuxERC20).mint(msg.sender, 10 * 10**18);
 
         emit AuctionBid(
             auctionId,
@@ -683,11 +688,11 @@ contract Auctions is
 
         require(
             uint256(auction.firstBidTime) != 0,
-            "Auction not started");
+            "Not started");
         require(
             block.timestamp >=
-            auction.firstBidTime.add(auction.duration),
-            "Auction not completed");
+            auction.firstBidTime + auction.duration,
+            "Not ended");
 
         try IERC721(auction.tokenContract).safeTransferFrom(
             address(this), auction.bidder, auction.tokenId
@@ -734,8 +739,8 @@ contract Auctions is
         }
 
         if (curator != address(0)) {
-            curatorFee = tokenOwnerProfit.mul(auction.fee).div(10000);
-            tokenOwnerProfit = tokenOwnerProfit.sub(curatorFee);
+            curatorFee = tokenOwnerProfit * auction.fee / 10000;
+            tokenOwnerProfit = tokenOwnerProfit - curatorFee;
             _handleOutgoingBid(curator, curatorFee);
         }
         _handleOutgoingBid(auction.tokenOwner, tokenOwnerProfit);
@@ -759,6 +764,9 @@ contract Auctions is
 
         _sellerAuctions[auction.tokenOwner].remove(auctionId);
 
+        ITuxERC20(tuxERC20).updateFeatured();
+        ITuxERC20(tuxERC20).mint(msg.sender, 10 * 10**18);
+
         emit AuctionEnded(
             auctionId
         );
@@ -781,10 +789,10 @@ contract Auctions is
     {
         require(
             auctions[auctionId].tokenOwner == msg.sender,
-            "Can only be called by auction creator");
+            "Not auction owner");
         require(
             uint256(auctions[auctionId].firstBidTime) == 0,
-            "Cannot cancel an auction once it has begun");
+            "Already started");
 
         _cancelAuction(auctionId);
     }
@@ -795,21 +803,23 @@ contract Auctions is
     {
         require(
             contracts[tokenContract].tokenContract == address(0),
-            "Token contract already registered");
+            "Already registered");
         require(
             IERC165(tokenContract).supportsInterface(interfaceId),
-            "Token contract does not support the ERC721 interface");
+            "Does not support ERC721");
         require(
             IERC165(tokenContract).supportsInterface(interfaceIdMetadata),
-            "Token contract does not support the ERC721 Metadata extension");
+            "Does not support ERC721Metadata");
         require(
             IERC165(tokenContract).supportsInterface(interfaceIdEnumerable),
-            "Token contract does not support the ERC721 Enumerable extension");
+            "Does not support ERC721Enumerable");
 
         contracts[tokenContract].name = IERC721Metadata(tokenContract).name();
         contracts[tokenContract].tokenContract = tokenContract;
 
         _rankedContracts.add(tokenContract);
+
+        ITuxERC20(tuxERC20).mint(msg.sender, 1 * 10**18);
     }
 
     function makeOffer(address tokenContract, uint256 tokenId)
@@ -820,17 +830,16 @@ contract Auctions is
     {
         require(
             IERC165(tokenContract).supportsInterface(interfaceId),
-            "Token contract does not support the ERC721 interface");
+            "Does not support ERC721");
 
         bytes32 auctionHash = keccak256(abi.encode(tokenContract, tokenId));
         require(
             tokenAuction[auctionHash] == 0,
-            'Auction exists for this token');
+            "Auction exists");
 
-        _offerIdTracker.increment();
-        uint256 offerId = _offerIdTracker.current();
+        _lastOfferId += 1;
 
-        offers[offerId] = Offer({
+        offers[_lastOfferId] = Offer({
             tokenContract: tokenContract,
             tokenId: tokenId,
             from: msg.sender,
@@ -838,7 +847,9 @@ contract Auctions is
             timestamp: block.timestamp
         });
 
-        _tokenOffers[auctionHash].add(offerId);
+        _tokenOffers[auctionHash].add(_lastOfferId);
+
+        ITuxERC20(tuxERC20).mint(msg.sender, 1 * 10**18);
     }
 
     function acceptOffer(uint256 offerId)
@@ -848,13 +859,11 @@ contract Auctions is
         IAuctions.Offer storage offer = offers[offerId];
         require(
             offer.tokenContract != address(0),
-            'Offer does not exist');
-
-        address tokenOwner = IERC721(offer.tokenContract).ownerOf(offer.tokenId);
+            "Does not exist");
         require(
-            msg.sender == tokenOwner ||
+            msg.sender == IERC721(offer.tokenContract).ownerOf(offer.tokenId) ||
             msg.sender == IERC721(offer.tokenContract).getApproved(offer.tokenId),
-            "Must be token owner or approved");
+            "Not owner or approved");
 
         IERC721(offer.tokenContract).safeTransferFrom(msg.sender, offer.from, offer.tokenId);
 
@@ -864,6 +873,8 @@ contract Auctions is
         _tokenOffers[auctionHash].remove(offerId);
 
         delete offers[offerId];
+
+        ITuxERC20(tuxERC20).mint(msg.sender, 1 * 10**18);
     }
 
     function cancelOffer(uint256 offerId)
@@ -873,7 +884,7 @@ contract Auctions is
         IAuctions.Offer storage offer = offers[offerId];
         require(
             offer.from == msg.sender,
-            'Not offer owner or does not exist');
+            "Not owner or missing");
 
         _handleOutgoingBid(msg.sender, offer.amount);
 
@@ -888,15 +899,12 @@ contract Auctions is
         override
     {
         require(
-            houses[houseId].lastRankedBids < houses[houseId].bids,
-            "House ranking already up to date");
+            _rankedHouses.scoreOf(houseId) < houses[houseId].bids,
+            "Rank up to date");
 
-        _rankedHouses.rankScore(
-            houseId,
-            houses[houseId].lastRankedBids,
-            houses[houseId].bids
-        );
-        houses[houseId].lastRankedBids = houses[houseId].bids;
+        _rankedHouses.rankScore(houseId, houses[houseId].bids);
+
+        ITuxERC20(tuxERC20).mint(msg.sender, 1 * 10**18);
     }
 
     function updateCreatorRank(address creator)
@@ -904,15 +912,12 @@ contract Auctions is
         override
     {
         require(
-            creatorStats[creator].lastRankedBids < creatorStats[creator].bids,
-            "Creator ranking already up to date");
+            _rankedCreators.scoreOf(creator) < creatorStats[creator].bids,
+            "Rank up to date");
 
-        _rankedCreators.rankScore(
-            creator,
-            creatorStats[creator].lastRankedBids,
-            creatorStats[creator].bids
-        );
-        creatorStats[creator].lastRankedBids = creatorStats[creator].bids;
+        _rankedCreators.rankScore(creator, creatorStats[creator].bids);
+
+        ITuxERC20(tuxERC20).mint(msg.sender, 1 * 10**18);
     }
 
     function updateCollectorRank(address collector)
@@ -920,15 +925,12 @@ contract Auctions is
         override
     {
         require(
-            collectorStats[collector].lastRankedBids < collectorStats[collector].bids,
-            "Collector ranking already up to date");
+            _rankedCollectors.scoreOf(collector) < collectorStats[collector].bids,
+            "Rank up to date");
 
-        _rankedCollectors.rankScore(
-            collector,
-            collectorStats[collector].lastRankedBids,
-            collectorStats[collector].bids
-        );
-        collectorStats[collector].lastRankedBids = collectorStats[collector].bids;
+        _rankedCollectors.rankScore(collector, collectorStats[collector].bids);
+
+        ITuxERC20(tuxERC20).mint(msg.sender, 1 * 10**18);
     }
 
     function updateContractRank(address tokenContract)
@@ -936,15 +938,32 @@ contract Auctions is
         override
     {
         require(
-            contracts[tokenContract].lastRankedBids < contracts[tokenContract].bids,
-            "Collection ranking already up to date");
+            _rankedContracts.scoreOf(tokenContract) < contracts[tokenContract].bids,
+            "Rank up to date");
 
-        _rankedContracts.rankScore(
-            tokenContract,
-            contracts[tokenContract].lastRankedBids,
-            contracts[tokenContract].bids
-        );
-        contracts[tokenContract].lastRankedBids = contracts[tokenContract].bids;
+        _rankedContracts.rankScore(tokenContract, contracts[tokenContract].bids);
+
+        ITuxERC20(tuxERC20).mint(msg.sender, 1 * 10**18);
+    }
+
+    function feature(uint256 auctionId, uint256 amount)
+        public
+        override
+    {
+        require(
+            auctions[auctionId].tokenOwner == msg.sender,
+            "Not token owner");
+        ITuxERC20(tuxERC20).feature(auctionId, amount, msg.sender);
+    }
+
+    function cancelFeature(uint256 auctionId)
+        public
+        override
+    {
+        require(
+            auctions[auctionId].tokenOwner == msg.sender,
+            "Not token owner");
+        ITuxERC20(tuxERC20).cancel(auctionId, msg.sender);
     }
 
     function _handleOutgoingBid(address to, uint256 amount) internal {

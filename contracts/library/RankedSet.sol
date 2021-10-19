@@ -3,19 +3,18 @@
 pragma solidity ^0.8.0;
 
 import "./OrderedSet.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
 
 /**
  * @title RankedSet
  * @dev Ranked data structure using two ordered sets, a mapping of scores to
- * boundary values, and a highest score.
+ * boundary values and counter, a mapping of last ranked scores, and a highest
+ * score.
  */
 library RankedSet {
-    using Counters for Counters.Counter;
     using OrderedSet for OrderedSet.Set;
 
     struct RankGroup {
-        Counters.Counter count;
+        uint256 count;
         uint256 start;
         uint256 end;
     }
@@ -23,6 +22,7 @@ library RankedSet {
     struct Set {
         uint256 highScore;
         mapping(uint256 => RankGroup) rankgroups;
+        mapping(uint256 => uint256) scores;
         OrderedSet.Set rankedScores;
         OrderedSet.Set rankedItems;
     }
@@ -33,18 +33,44 @@ library RankedSet {
     function add(Set storage set, uint256 item) internal {
         set.rankedItems.append(item);
         set.rankgroups[0].end = item;
-        set.rankgroups[0].count.increment();
+        set.rankgroups[0].count += 1;
         if (set.rankgroups[0].start == 0) {
             set.rankgroups[0].start = item;
         }
     }
 
     /**
-     * @dev Remove an item TODO
+     * @dev Remove an item
      */
-    /* function remove(Set storage set, uint256 item) internal {
+    function remove(Set storage set, uint256 item) internal {
+        uint256 score = set.scores[item];
+        delete set.scores[item];
+
+        RankGroup storage rankgroup = set.rankgroups[score];
+        if (rankgroup.count > 0) {
+            rankgroup.count -= 1;
+        }
+
+        if (rankgroup.count == 0) {
+            rankgroup.start = 0;
+            rankgroup.end = 0;
+            if (score == set.highScore) {
+                set.highScore = set.rankedScores.next(score);
+            }
+            if (score > 0) {
+                set.rankedScores.remove(score);
+            }
+        } else {
+            if (rankgroup.start == item) {
+                rankgroup.start = set.rankedItems.next(item);
+            }
+            if (rankgroup.end == item) {
+                rankgroup.end = set.rankedItems.prev(item);
+            }
+        }
+
         set.rankedItems.remove(item);
-    } */
+    }
 
     /**
      * @dev Returns the head
@@ -64,7 +90,7 @@ library RankedSet {
      * @dev Returns the length
      */
     function length(Set storage set) internal view returns (uint256) {
-        return set.rankedItems.counter.current();
+        return set.rankedItems.count;
     }
 
     /**
@@ -91,6 +117,13 @@ library RankedSet {
     }
 
     /**
+     * @dev Returns a value's score
+     */
+    function scoreOf(Set storage set, uint256 value) internal view returns (uint256) {
+        return set.scores[value];
+    }
+
+    /**
      * @dev Return the entire set in an array
      *
      * WARNING: This operation will copy the entire storage to memory, which can be quite expensive. This is designed
@@ -99,7 +132,7 @@ library RankedSet {
      * uncallable if the set grows to a point where copying to memory consumes too much gas to fit in a block.
      */
     function values(Set storage set) internal view returns (uint256[] memory) {
-        uint256[] memory _values = new uint256[](set.rankedItems.counter.current());
+        uint256[] memory _values = new uint256[](set.rankedItems.count);
         uint256 value = set.rankedItems._next[0];
         uint256 i = 0;
         while (value != 0) {
@@ -128,37 +161,24 @@ library RankedSet {
     /**
      * @dev Rank new score
      */
-    function rankScore(Set storage set, uint256 item, uint256 score, uint256 newScore) internal {
-        RankGroup storage rankgroup = set.rankgroups[score];
-        rankgroup.count.decrement();
-
-        uint256 lastScore = score;
-        uint256 rankStart = rankgroup.start;
+    function rankScore(Set storage set, uint256 item, uint256 newScore) internal {
+        uint256 score = set.scores[item];
+        uint256 rankCount = set.rankgroups[score].count;
         uint256 prevScore = set.rankedScores.prev(score);
 
-        if (rankgroup.start == item) {
-            rankStart = set.rankedItems.next(item);
-            rankgroup.start = rankStart;
+        remove(set, item);
+
+        set.scores[item] = newScore;
+
+        if (rankCount == 1) {
+            score = set.rankedScores.next(score);
         }
-        if (rankgroup.end == item) {
-            rankgroup.end = set.rankedItems.prev(item);
-        }
+
         while (prevScore > 0 && newScore > prevScore) {
             prevScore = set.rankedScores.prev(prevScore);
-            rankStart = set.rankgroups[set.rankedScores.next(prevScore)].start;
         }
 
-        if (rankgroup.count.current() == 0) {
-            rankgroup.start = 0;
-            rankgroup.end = 0;
-            if (score > 0) {
-                set.rankedScores.remove(score);
-            }
-            lastScore = set.rankedScores.next(score);
-        }
-
-        set.rankedItems.remove(item);
-        rankgroup = set.rankgroups[newScore];
+        RankGroup storage rankgroup = set.rankgroups[newScore];
 
         if (newScore > set.highScore) {
             rankgroup.start = item;
@@ -166,14 +186,18 @@ library RankedSet {
             set.rankedItems.add(item);
             set.rankedScores.add(newScore);
         } else {
-            set.rankedItems.insert(set.rankgroups[prevScore].end, item, rankStart);
-            if (rankgroup.count.current() == 0) {
-                set.rankedScores.insert(prevScore, newScore, lastScore);
+            set.rankedItems.insert(
+                set.rankgroups[prevScore].end,
+                item,
+                set.rankgroups[set.rankedScores.next(prevScore)].start
+            );
+            if (rankgroup.count == 0) {
+                set.rankedScores.insert(prevScore, newScore, score);
                 rankgroup.start = item;
             }
         }
 
         rankgroup.end = item;
-        rankgroup.count.increment();
+        rankgroup.count += 1;
     }
 }

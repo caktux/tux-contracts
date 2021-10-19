@@ -2,8 +2,7 @@
 
 pragma solidity 0.8.9;
 
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "./library/UintSet.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -23,16 +22,15 @@ contract Tux is
     ERC721Burnable,
     ReentrancyGuard
 {
-    using Counters for Counters.Counter;
-    using EnumerableSet for EnumerableSet.UintSet;
+    using UintSet for UintSet.Set;
 
-    string private _baseTokenURI = 'ipfs://';
+    uint256 private _lastTokenId;
 
-    Counters.Counter private _tokenIdTracker;
+    string private _baseTokenURI = "ipfs://";
 
     mapping(uint256 => address) public tokenCreators;
 
-    mapping(address => EnumerableSet.UintSet) private _creatorTokens;
+    mapping(address => UintSet.Set) private _creatorTokens;
 
 
     constructor(
@@ -68,7 +66,7 @@ contract Tux is
         return tokenCreators[tokenId];
     }
 
-    function getCreatorTokens(address creator) public view override returns (uint256[] memory) {
+    function creatorTokens(address creator) public view override returns (uint256[] memory) {
         return _creatorTokens[creator].values();
     }
 
@@ -82,11 +80,11 @@ contract Tux is
         public
         nonReentrant
     {
-        require(bytes(_tokenURI).length != 0, 'Tux: empty tokenURI');
+        require(bytes(_tokenURI).length != 0, "Missing tokenURI");
 
-        _tokenIdTracker.increment();
+        _lastTokenId += 1;
 
-        uint256 tokenId = _tokenIdTracker.current();
+        uint256 tokenId = _lastTokenId;
 
         _safeMint(msg.sender, tokenId);
 

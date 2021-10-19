@@ -10,7 +10,8 @@
     "compile": "yarn build",
     "deploy": "hardhat run --network localhost scripts/deploy.js",
     "verify": "hardhat verify --network mainnet 0xc71f367cd67788771b7eDeF9498F699a473Ae92C",
-    "verifyTux": "hardhat verify --network mainnet 0xc83FcA08E12e609E747c13C9297a770CE1955A0D 'Tux' 'TUX'"
+    "verifyTux": "hardhat verify --network mainnet 0xc83FcA08E12e609E747c13C9297a770CE1955A0D 'Tux' 'TUX'",
+    "verifyTuxERC20": "hardhat verify --network mainnet 0x... 'Tux' 'TUX'"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
@@ -22,7 +23,7 @@
     "@types/chai": "^4.2.22",
     "@types/chai-as-promised": "^7.1.4",
     "@types/mocha": "^9.0.0",
-    "@types/node": "^16.11.0",
+    "@types/node": "^16.11.1",
     "chai": "^4.3.4",
     "chai-as-promised": "^7.1.1",
     "ethereum-waffle": "^3.4.0",

@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/utils/Counters.sol";
-
 /**
  * @title OrderedSet
  * @dev Ordered data structure. It has the properties of a mapping of uint256, but members are ordered
@@ -11,10 +9,9 @@ import "@openzeppelin/contracts/utils/Counters.sol";
  * contains are O(1). Enumerate is O(N).
  */
 library OrderedSet {
-    using Counters for Counters.Counter;
 
     struct Set {
-        Counters.Counter counter;
+        uint256 count;
         mapping (uint256 => uint256) _next;
         mapping (uint256 => uint256) _prev;
     }
@@ -27,7 +24,7 @@ library OrderedSet {
         set._next[value] = next_;
         set._prev[next_] = value;
         set._prev[value] = prev_;
-        set.counter.increment();
+        set.count += 1;
     }
 
     /**
@@ -52,7 +49,9 @@ library OrderedSet {
         set._prev[set._next[value]] = set._prev[value];
         delete set._next[value];
         delete set._prev[value];
-        set.counter.decrement();
+        if (set.count > 0) {
+            set.count -= 1;
+        }
     }
 
     /**
@@ -73,7 +72,7 @@ library OrderedSet {
      * @dev Returns the length
      */
     function length(Set storage set) internal view returns (uint256) {
-        return set.counter.current();
+        return set.count;
     }
 
     /**
@@ -108,7 +107,7 @@ library OrderedSet {
      * uncallable if the set grows to a point where copying to memory consumes too much gas to fit in a block.
      */
     function values(Set storage set) internal view returns (uint256[] memory) {
-        uint256[] memory _values = new uint256[](set.counter.current());
+        uint256[] memory _values = new uint256[](set.count);
         uint256 value = set._next[0];
         uint256 i = 0;
         while (value != 0) {

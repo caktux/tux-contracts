@@ -4,9 +4,9 @@ import { ethers } from "hardhat"
 import { BigNumber } from "ethers"
 import { sha256 } from "ethers/lib/utils"
 
-import { Tux } from "../typechain"
-
 import {
+  Tux,
+  TuxERC20,
   Auctions,
   BadBidder,
   BadERC721,
@@ -37,20 +37,27 @@ export const deployTux = async () => {
   const [deployer] = await ethers.getSigners()
 
   const Tux = await ethers.getContractFactory('contracts/Tux.sol:Tux')
-  const tux = await (
-    await Tux.connect(deployer).deploy('tux', 'TUX')
-  ).deployed()
+  const tux = await Tux.connect(deployer).deploy('Tux', 'TUX') as Tux
+
+  return tux
+}
+
+export const deployTuxERC20 = async () => {
+  const [deployer] = await ethers.getSigners()
+
+  const Tux = await ethers.getContractFactory('contracts/TuxERC20.sol:TuxERC20')
+  const tux = await Tux.connect(deployer).deploy('Tux', 'TUX') as TuxERC20
 
   return tux
 }
 
 export const deployBidder = async (auction: string, contract: string) => {
   return (await (
-    await (await ethers.getContractFactory('contracts/test/BadBidder.sol:BadBidder')).deploy(
+    await ethers.getContractFactory('contracts/test/BadBidder.sol:BadBidder')
+  ).deploy(
       auction,
       contract
-    )
-  ).deployed()) as BadBidder
+  )) as BadBidder
 }
 
 export const mint = async (tux: Tux) => {

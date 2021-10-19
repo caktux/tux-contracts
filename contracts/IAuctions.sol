@@ -35,9 +35,6 @@ interface IAuctions {
 
         // Counter of active autions
         uint256 activeAuctions;
-
-        // Last ranked bid count
-        uint256 lastRankedBids;
     }
 
     struct Auction {
@@ -84,7 +81,6 @@ interface IAuctions {
         uint256 bids;
         uint256 sales;
         uint256 total;
-        uint256 lastRankedBids;
     }
 
     struct Account {
@@ -97,7 +93,6 @@ interface IAuctions {
         uint256 bids;
         uint256 sales;
         uint256 total;
-        uint256 lastRankedBids;
     }
 
     struct CollectorStats {
@@ -106,7 +101,6 @@ interface IAuctions {
         uint256 bought;
         uint256 totalSold;
         uint256 totalSpent;
-        uint256 lastRankedBids;
     }
 
     struct Bid {
@@ -261,7 +255,7 @@ interface IAuctions {
         uint16  fee,
         bool    preApproved,
         string  memory metadata
-    ) external returns (uint256);
+    ) external;
 
     function addCreator(
         uint256 houseId,
@@ -301,7 +295,7 @@ interface IAuctions {
         uint256 duration,
         uint256 reservePrice,
         uint256 houseId
-    ) external returns (uint256);
+    ) external;
 
     function setAuctionApproval(
         uint256 auctionId,
@@ -326,6 +320,15 @@ interface IAuctions {
     ) external payable;
 
     function cancelAuction(
+        uint256 auctionId
+    ) external;
+
+    function feature(
+        uint256 auctionId,
+        uint256 amount
+    ) external;
+
+    function cancelFeature(
         uint256 auctionId
     ) external;
 

@@ -125,7 +125,7 @@ describe('Tux', () => {
           tux,
           ''
         )
-      ).rejectedWith('Tux: empty tokenURI')
+      ).rejectedWith('Missing tokenURI')
     })
 
     it('should list tokens created by a creator', async () => {
@@ -145,7 +145,7 @@ describe('Tux', () => {
         )
       ).fulfilled
 
-      const creatorTokens = await tux.getCreatorTokens(creatorWallet.address)
+      const creatorTokens = await tux.creatorTokens(creatorWallet.address)
       await expect(creatorTokens.length).eq(2)
     })
 
@@ -159,7 +159,7 @@ describe('Tux', () => {
         )
       ).fulfilled
 
-      const creatorTokens = await tux.getCreatorTokens(creatorWallet.address)
+      const creatorTokens = await tux.creatorTokens(creatorWallet.address)
       await expect(creatorTokens.length).eq(1)
 
       const tokenCreator = await tux.tokenCreator(creatorTokens[0])

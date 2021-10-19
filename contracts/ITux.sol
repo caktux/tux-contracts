@@ -6,5 +6,5 @@ import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 interface ITux is IERC721 {
     function tokenCreator(uint256 tokenId) external view returns (address);
-    function getCreatorTokens(address creator) external view returns (uint256[] memory);
+    function creatorTokens(address creator) external view returns (uint256[] memory);
 }
