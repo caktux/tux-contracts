@@ -29,9 +29,11 @@ module.exports = {
   defaultNetwork: 'hardhat',
   networks: {
     localhost: {
-      url: 'http://127.0.0.1:8545'
+      url: 'http://127.0.0.1:8545',
+      chainId: 1337
     },
     hardhat: {
+      chainId: 1337,
       gasPrice: 75000000000,
       gasMultiplier: 1.1,
       // mining: {

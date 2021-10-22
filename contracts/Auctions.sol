@@ -11,20 +11,18 @@ import "./library/AddressSet.sol";
 import "./library/OrderedSet.sol";
 import "./library/RankedSet.sol";
 import "./library/RankedAddressSet.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import { IERC721, IERC165 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { IERC721Metadata } from "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 
 
 contract Auctions is
-    IAuctions,
-    ReentrancyGuard
+    IAuctions
 {
     using UintSet for UintSet.Set;
-    using RankedSet for RankedSet.Set;
-    using RankedAddressSet for RankedAddressSet.Set;
     using AddressSet for AddressSet.Set;
     using OrderedSet for OrderedSet.Set;
+    using RankedSet for RankedSet.Set;
+    using RankedAddressSet for RankedAddressSet.Set;
 
     uint256 private _lastBidId;
     uint256 private _lastOfferId;
@@ -69,6 +67,9 @@ contract Auctions is
 
     // Mapping from collector to stats
     mapping(address => IAuctions.CollectorStats) public collectorStats;
+
+    // Mapping from creator to token contracts
+    mapping(address => AddressSet.Set) private _collections;
 
     // Mapping from house ID to token IDs requiring approval
     mapping(uint256 => UintSet.Set) private _houseQueue;
@@ -200,19 +201,15 @@ contract Auctions is
         return _rankedContracts.valuesFromN(from, n);
     }
 
-    function getAuctions() public view override returns (uint256[] memory) {
-        return _activeAuctions.values();
+    function getCollections(address creator) external view override returns (address[] memory) {
+        return _collections[creator].values();
     }
 
-    function getAuctionsFromN(uint256 from, uint256 n) public view override returns (uint256[] memory) {
+    function getAuctions(uint256 from, uint256 n) public view override returns (uint256[] memory) {
         return _activeAuctions.valuesFromN(from, n);
     }
 
-    function getHouseAuctions(uint256 houseId) public view override returns (uint256[] memory) {
-        return _houseAuctions[houseId].values();
-    }
-
-    function getHouseAuctionsFromN(uint256 houseId, uint256 from, uint256 n) public view override returns (uint256[] memory) {
+    function getHouseAuctions(uint256 houseId, uint256 from, uint256 n) public view override returns (uint256[] memory) {
         return _houseAuctions[houseId].valuesFromN(from, n);
     }
 
@@ -262,7 +259,6 @@ contract Auctions is
     )
         public
         override
-        nonReentrant
     {
         require(
             houseIDs[name] == 0,
@@ -281,22 +277,23 @@ contract Auctions is
             "Fee too high");
 
         _lastHouseId += 1;
+        uint256 houseId = _lastHouseId;
 
-        houses[_lastHouseId].name = name;
-        houses[_lastHouseId].curator = payable(curator);
-        houses[_lastHouseId].fee = fee;
-        houses[_lastHouseId].preApproved = preApproved;
-        houses[_lastHouseId].metadata = metadata;
+        houses[houseId].name = name;
+        houses[houseId].curator = payable(curator);
+        houses[houseId].fee = fee;
+        houses[houseId].preApproved = preApproved;
+        houses[houseId].metadata = metadata;
 
-        _curatorHouses[curator].add(_lastHouseId);
-        _rankedHouses.add(_lastHouseId);
-        houseIDs[name] = _lastHouseId;
+        _curatorHouses[curator].add(houseId);
+        _rankedHouses.add(houseId);
+        houseIDs[name] = houseId;
 
         ITuxERC20(tuxERC20).updateFeatured();
         ITuxERC20(tuxERC20).mint(msg.sender, 5 * 10**18);
 
         emit HouseCreated(
-            _lastHouseId
+            houseId
         );
     }
 
@@ -428,7 +425,6 @@ contract Auctions is
     )
         public
         override
-        nonReentrant
     {
         if (contracts[tokenContract].tokenContract == address(0)) {
             registerTokenContract(tokenContract);
@@ -466,16 +462,17 @@ contract Auctions is
         } catch {}
 
         _lastAuctionId += 1;
+        uint256 auctionId = _lastAuctionId;
 
-        tokenAuction[keccak256(abi.encode(tokenContract, tokenId))] = _lastAuctionId;
+        tokenAuction[keccak256(abi.encode(tokenContract, tokenId))] = auctionId;
 
-        _sellerAuctions[tokenOwner].add(_lastAuctionId);
+        _sellerAuctions[tokenOwner].add(auctionId);
 
         bool approved = (curator == address(0) || preApproved || curator == tokenOwner);
 
         if (houseId > 0) {
             if (approved == true) {
-                _houseAuctions[houseId].add(_lastAuctionId);
+                _houseAuctions[houseId].add(auctionId);
                 if (_activeHouses.head() != houseId) {
                     if (_activeHouses.contains(houseId)) {
                         _activeHouses.remove(houseId);
@@ -484,14 +481,14 @@ contract Auctions is
                 }
             }
             else {
-                _houseQueue[houseId].add(_lastAuctionId);
+                _houseQueue[houseId].add(auctionId);
             }
         }
         else {
-            _activeAuctions.add(_lastAuctionId);
+            _activeAuctions.add(auctionId);
         }
 
-        auctions[_lastAuctionId] = Auction({
+        auctions[auctionId] = Auction({
             tokenContract: tokenContract,
             tokenId: tokenId,
             tokenOwner: tokenOwner,
@@ -512,7 +509,7 @@ contract Auctions is
         ITuxERC20(tuxERC20).mint(msg.sender, 10 * 10**18);
 
         emit AuctionCreated(
-            _lastAuctionId
+            auctionId
         );
     }
 
@@ -581,7 +578,6 @@ contract Auctions is
         public
         payable
         override
-        nonReentrant
         auctionExists(auctionId)
     {
         IAuctions.Auction storage auction = auctions[auctionId];
@@ -618,14 +614,15 @@ contract Auctions is
 
         if (auction.duration > 0) {
             _lastBidId += 1;
+            uint256 bidId = _lastBidId;
 
-            bids[_lastBidId] = Bid({
+            bids[bidId] = Bid({
                 timestamp: block.timestamp,
                 bidder: msg.sender,
                 value: msg.value
             });
 
-            _auctionBids[auctionId].add(_lastBidId);
+            _auctionBids[auctionId].add(bidId);
             _bidderAuctions[msg.sender].add(auctionId);
         }
 
@@ -681,7 +678,6 @@ contract Auctions is
     function endAuction(uint256 auctionId)
         public
         override
-        nonReentrant
         auctionExists(auctionId)
     {
         IAuctions.Auction storage auction = auctions[auctionId];
@@ -784,7 +780,6 @@ contract Auctions is
     function cancelAuction(uint256 auctionId)
         public
         override
-        nonReentrant
         auctionExists(auctionId)
     {
         require(
@@ -817,6 +812,12 @@ contract Auctions is
         contracts[tokenContract].name = IERC721Metadata(tokenContract).name();
         contracts[tokenContract].tokenContract = tokenContract;
 
+        try ITux(tokenContract).owner() returns(address owner) {
+            if (owner != address(0)) {
+                _collections[owner].add(tokenContract);
+            }
+        } catch {}
+
         _rankedContracts.add(tokenContract);
 
         ITuxERC20(tuxERC20).mint(msg.sender, 1 * 10**18);
@@ -824,9 +825,8 @@ contract Auctions is
 
     function makeOffer(address tokenContract, uint256 tokenId)
         public
-        override
         payable
-        nonReentrant
+        override
     {
         require(
             IERC165(tokenContract).supportsInterface(interfaceId),
@@ -838,8 +838,9 @@ contract Auctions is
             "Auction exists");
 
         _lastOfferId += 1;
+        uint256 offerId = _lastOfferId;
 
-        offers[_lastOfferId] = Offer({
+        offers[offerId] = Offer({
             tokenContract: tokenContract,
             tokenId: tokenId,
             from: msg.sender,
@@ -847,7 +848,7 @@ contract Auctions is
             timestamp: block.timestamp
         });
 
-        _tokenOffers[auctionHash].add(_lastOfferId);
+        _tokenOffers[auctionHash].add(offerId);
 
         ITuxERC20(tuxERC20).mint(msg.sender, 1 * 10**18);
     }

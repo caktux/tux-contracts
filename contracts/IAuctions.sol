@@ -206,13 +206,11 @@ interface IAuctions {
 
     function getRankedContracts(address from, uint256 n) external view returns (address[] memory);
 
-    function getAuctions() external view returns (uint256[] memory);
+    function getCollections(address creator) external view returns (address[] memory);
 
-    function getAuctionsFromN(uint256 from, uint256 n) external view returns (uint256[] memory);
+    function getAuctions(uint256 from, uint256 n) external view returns (uint256[] memory);
 
-    function getHouseAuctions(uint256 houseId) external view returns (uint256[] memory);
-
-    function getHouseAuctionsFromN(uint256 houseId, uint256 from, uint256 n) external view returns (uint256[] memory);
+    function getHouseAuctions(uint256 houseId, uint256 from, uint256 n) external view returns (uint256[] memory);
 
     function getHouseQueue(uint256 houseId) external view returns (uint256[] memory);
 

@@ -58,7 +58,7 @@ contract Tux is
         super._beforeTokenTransfer(from, to, tokenId);
     }
 
-    function owner() public pure returns (address) {
+    function owner() public pure override returns (address) {
         return address(0);
     }
 

@@ -47,11 +47,14 @@ contract TuxERC20 is
     // Timestamp of next payouts
     uint256 public nextPayoutsTime = block.timestamp + payoutsFrequency;
 
+    // Payout amount to pinning and API services
+    uint256 public payoutAmount = 100 * 10**18;
+
+    // AddressSet of payout addresses to pinning and API services
+    AddressSet.Set private _payoutAddresses;
+
     // RankedSet for queue of next featured auction
     RankedSet.Set private _featuredQueue;
-
-    // AddressSet of payout addresses to pinning services
-    AddressSet.Set private _payoutAddresses;
 
     /**
      * @dev Mints 100,000 tokens and adds payout addresses.
@@ -80,8 +83,8 @@ contract TuxERC20 is
         external
     {
         require(
-            minter == address(0) || msg.sender == owner,
-            "Already set or not owner");
+            msg.sender == owner,
+            "Not owner address");
 
         minter = minter_;
     }
@@ -116,9 +119,26 @@ contract TuxERC20 is
     }
 
     /**
-     * @dev Forfeit ownership once payout addresses are added.
+     * @dev Update payout amount up to 1000.
      */
-    function forfeitOwnership()
+    function updatePayoutAmount(uint256 amount)
+        external
+    {
+        require(
+            msg.sender == owner,
+            "Not owner address");
+        require(
+            amount < 1000 * 10**18,
+            "Amount too high");
+
+        payoutAmount = amount;
+    }
+
+    /**
+     * @dev Renounce ownership once payout addresses are added and the payout
+     * amount gets settled.
+     */
+    function renounceOwnership()
         external
     {
         require(
@@ -299,7 +319,7 @@ contract TuxERC20 is
         nextPayoutsTime = block.timestamp + payoutsFrequency;
 
         for (uint i = 0; i < _payoutAddresses.length(); i++) {
-            _mint(_payoutAddresses.at(i), 100 * 10**18);
+            _mint(_payoutAddresses.at(i), payoutAmount);
         }
 
         _mint(msg.sender, 1 * 10**18);
