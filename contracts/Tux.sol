@@ -3,7 +3,6 @@
 pragma solidity 0.8.9;
 
 import "./library/UintSet.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -19,8 +18,7 @@ contract Tux is
     ERC721,
     ERC721URIStorage,
     ERC721Enumerable,
-    ERC721Burnable,
-    ReentrancyGuard
+    ERC721Burnable
 {
     using UintSet for UintSet.Set;
 
@@ -78,7 +76,6 @@ contract Tux is
 
     function mint(string memory _tokenURI)
         public
-        nonReentrant
     {
         require(bytes(_tokenURI).length != 0, "Missing tokenURI");
 

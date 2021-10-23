@@ -271,7 +271,7 @@ describe("Auctions", () => {
       await auctions.cancelAuction(3)
       await createAuction(auctions, 1, 3)
 
-      const auctionList = await auctions.getHouseAuctions(1)
+      const auctionList = await auctions.getHouseAuctions(1, AddressZero, 4)
 
       expect(auctionList.length).eq(4)
       expect(auctionList[0]).eq(5)
