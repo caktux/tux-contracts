@@ -225,6 +225,7 @@ contract TuxERC20 is
             "Not queued");
 
         _mint(from, _featuredQueue.scoreOf(auctionId));
+
         _featuredQueue.remove(auctionId);
 
         updateFeatured();

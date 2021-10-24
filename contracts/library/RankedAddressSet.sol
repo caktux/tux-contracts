@@ -163,35 +163,34 @@ library RankedAddressSet {
      * @dev Rank new score
      */
     function rankScore(Set storage set, address item, uint256 newScore) internal {
-        uint256 score = set.scores[item];
-        uint256 rankCount = set.rankgroups[score].count;
-        uint256 prevScore = set.rankedScores.prev(score);
-
-        remove(set, item);
-
-        set.scores[item] = newScore;
-
-        if (rankCount == 1) {
-            score = set.rankedScores.next(score);
-        }
-
-        while (prevScore > 0 && newScore > prevScore) {
-            prevScore = set.rankedScores.prev(prevScore);
-        }
-
         RankGroup storage rankgroup = set.rankgroups[newScore];
 
         if (newScore > set.highScore) {
+            remove(set, item);
             rankgroup.start = item;
             set.highScore = newScore;
             set.rankedItems.add(item);
             set.rankedScores.add(newScore);
         } else {
+            uint256 score = set.scores[item];
+            uint256 prevScore = set.rankedScores.prev(score);
+
+            if (set.rankgroups[score].count == 1) {
+                score = set.rankedScores.next(score);
+            }
+
+            remove(set, item);
+
+            while (prevScore > 0 && newScore > prevScore) {
+                prevScore = set.rankedScores.prev(prevScore);
+            }
+
             set.rankedItems.insert(
                 set.rankgroups[prevScore].end,
                 item,
                 set.rankgroups[set.rankedScores.next(prevScore)].start
             );
+
             if (rankgroup.count == 0) {
                 set.rankedScores.insert(prevScore, newScore, score);
                 rankgroup.start = item;
@@ -200,5 +199,7 @@ library RankedAddressSet {
 
         rankgroup.end = item;
         rankgroup.count += 1;
+
+        set.scores[item] = newScore;
     }
 }
