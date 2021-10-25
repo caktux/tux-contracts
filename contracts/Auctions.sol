@@ -734,7 +734,7 @@ contract Auctions is
             _activeAuctions.remove(auctionId);
         }
 
-        if (curator != address(0)) {
+        if (curator != address(0) && auction.fee > 0) {
             curatorFee = tokenOwnerProfit * auction.fee / 10000;
             tokenOwnerProfit = tokenOwnerProfit - curatorFee;
             _handleOutgoingBid(curator, curatorFee);
